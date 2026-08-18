@@ -33,11 +33,32 @@ const correctiveActionInput = document.getElementById("correctiveActionInput");
 const saveMeasurementButton = document.getElementById("saveMeasurementButton");
 const refreshButton = document.getElementById("refreshButton");
 const recordsList = document.getElementById("recordsList");
+const poolRecordsList = document.getElementById("poolRecordsList");
+
+// ============ БАССЕЙНЫ ============
+const poolSelect = document.getElementById("poolSelect");
+const addPoolButton = document.getElementById("addPoolButton");
+const poolInfo = document.getElementById("poolInfo");
+const poolDateInput = document.getElementById("poolDateInput");
+const poolTimeInput = document.getElementById("poolTimeInput");
+const chlorineInput = document.getElementById("chlorineInput");
+const phInput = document.getElementById("phInput");
+const poolTempInput = document.getElementById("poolTempInput");
+const poolResponsibleInput = document.getElementById("poolResponsibleInput");
+const poolCorrectiveInput = document.getElementById("poolCorrectiveInput");
+const savePoolButton = document.getElementById("savePoolButton");
 
 let supabaseClient = null;
 let currentUser = null;
 let currentProfile = null;
 let equipmentMap = new Map();
+let poolMap = new Map();
+
+const POOL_NORMS = {
+    adult: { t: [24, 26], cl: [0.3, 0.6], ph: [6, 9] },
+    children: { t: [30, 32], cl: [0.1, 0.3], ph: [6, 9] },
+    open: { t: [27, 29], cl: [0.3, 0.6], ph: [6, 9] }
+};
 
 function escapeHtml(value) {
     return String(value ?? "")
@@ -52,7 +73,6 @@ function createTextId() {
     if (window.crypto && typeof window.crypto.randomUUID === "function") {
         return window.crypto.randomUUID().replaceAll("-", "");
     }
-
     return Date.now().toString(16) + Math.random().toString(16).slice(2);
 }
 
@@ -81,11 +101,12 @@ function setCurrentDateAndTime() {
 
     dateInput.value = `${year}-${month}-${day}`;
     timeInput.value = `${hours}:${minutes}`;
+    if (poolDateInput) poolDateInput.value = `${year}-${month}-${day}`;
+    if (poolTimeInput) poolTimeInput.value = `${hours}:${minutes}`;
 }
 
 function resetSelect(selectElement, placeholder) {
     selectElement.innerHTML = "";
-
     const option = document.createElement("option");
     option.value = "";
     option.textContent = placeholder;
@@ -94,7 +115,6 @@ function resetSelect(selectElement, placeholder) {
 
 function fillSelect(selectElement, items, placeholder) {
     resetSelect(selectElement, placeholder);
-
     for (const item of items) {
         const option = document.createElement("option");
         option.value = item.id;
@@ -109,7 +129,6 @@ function getRoleName(role) {
         manager: "Руководитель объекта",
         employee: "Сотрудник подразделения"
     };
-
     return roleNames[role] || role || "Пользователь";
 }
 
@@ -147,15 +166,14 @@ async function loadProfile() {
     }
 
     if (!data.active) {
-        throw new Error(
-            "Ваш аккаунт ещё не активирован или отключён администратором."
-        );
+        throw new Error("Ваш аккаунт ещё не активирован или отключён администратором.");
     }
 
     currentProfile = data;
     userName.textContent = data.full_name || "Пользователь";
     userRole.textContent = getRoleName(data.role);
     responsibleInput.value = data.full_name || "";
+    if (poolResponsibleInput) poolResponsibleInput.value = data.full_name || "";
 }
 
 async function loadObjects() {
@@ -237,14 +255,8 @@ async function loadEquipment(departmentId) {
     }
 
     const columns = [
-        "id",
-        "name",
-        "equipment_type",
-        "location",
-        "temperature_min",
-        "temperature_max",
-        "responsible",
-        "control_times"
+        "id", "name", "equipment_type", "location",
+        "temperature_min", "temperature_max", "responsible", "control_times"
     ].join(", ");
 
     const { data, error } = await supabaseClient
@@ -283,8 +295,7 @@ function showEquipmentInfo() {
     const minimum = Number(equipment.temperature_min);
     const maximum = Number(equipment.temperature_max);
     const times = Array.isArray(equipment.control_times)
-        ? equipment.control_times.join(", ")
-        : "—";
+        ? equipment.control_times.join(", ") : "—";
 
     equipmentInfo.innerHTML = `
         <strong>${escapeHtml(equipment.name)}</strong><br>
@@ -306,23 +317,12 @@ async function loadRecords() {
 
     const { data, error } = await supabaseClient
         .from("haccp_temperature_records")
-        .select(
-            [
-                "id",
-                "object_id",
-                "department_id",
-                "equipment_id",
-                "measurement_date",
-                "measurement_time",
-                "temperature",
-                "temperature_min",
-                "temperature_max",
-                "status",
-                "responsible",
-                "corrective_action",
-                "created_at"
-            ].join(", ")
-        )
+        .select([
+            "id", "object_id", "department_id", "equipment_id",
+            "measurement_date", "measurement_time", "temperature",
+            "temperature_min", "temperature_max", "status",
+            "responsible", "corrective_action", "created_at"
+        ].join(", "))
         .order("measurement_date", { ascending: false })
         .order("measurement_time", { ascending: false })
         .limit(20);
@@ -427,25 +427,15 @@ async function saveMeasurement() {
         return;
     }
 
-    const status = temperature >= minimum && temperature <= maximum
-        ? "Норма"
-        : "Отклонение";
+    const status = temperature >= minimum && temperature <= maximum ? "Норма" : "Отклонение";
 
     if (status === "Отклонение" && !correctiveAction) {
-        showMessage(
-            "При отклонении обязательно укажите корректирующее действие.",
-            "warning"
-        );
+        showMessage("При отклонении обязательно укажите корректирующее действие.", "warning");
         correctiveActionInput.focus();
         return;
     }
 
-    setButtonLoading(
-        saveMeasurementButton,
-        true,
-        "💾 Сохранить измерение",
-        "⏳ Сохранение..."
-    );
+    setButtonLoading(saveMeasurementButton, true, "💾 Сохранить измерение", "⏳ Сохранение...");
 
     const record = {
         id: createTextId(),
@@ -466,19 +456,11 @@ async function saveMeasurement() {
         .from("haccp_temperature_records")
         .insert(record);
 
-    setButtonLoading(
-        saveMeasurementButton,
-        false,
-        "💾 Сохранить измерение",
-        "⏳ Сохранение..."
-    );
+    setButtonLoading(saveMeasurementButton, false, "💾 Сохранить измерение", "⏳ Сохранение...");
 
     if (error) {
         if (error.code === "23505") {
-            showMessage(
-                "Для этого оборудования на выбранные дату и время запись уже существует.",
-                "warning"
-            );
+            showMessage("Для этого оборудования на выбранные дату и время запись уже существует.", "warning");
         } else {
             showMessage(`Ошибка сохранения: ${error.message}`, "error");
         }
@@ -492,9 +474,186 @@ async function saveMeasurement() {
     await loadRecords();
 }
 
-async function login() {
+// ============ ЖУРНАЛ БАССЕЙНОВ ============
+async function loadPoolRecords() {
+    if (!poolRecordsList) return;
+    poolRecordsList.innerHTML = '<div class="empty">Загрузка...</div>';
+    const { data, error } = await supabaseClient
+        .from("pool_water_records")
+        .select("id, pool_id, measurement_date, measurement_time, free_chlorine, ph, temperature, status, responsible, corrective_action")
+        .order("measurement_date", { ascending: false })
+        .order("measurement_time", { ascending: false })
+        .limit(20);
+    if (error) {
+        poolRecordsList.innerHTML = '<div class="empty">Не удалось загрузить.</div>';
+        showMessage(`Ошибка журнала бассейнов: ${error.message}`, "error");
+        return;
+    }
+    if (!data || data.length === 0) {
+        poolRecordsList.innerHTML = '<div class="empty">Записей пока нет.</div>';
+        return;
+    }
+    const poolIds = [...new Set(data.map((r) => r.pool_id).filter(Boolean))];
+    const poolsRes = poolIds.length
+        ? await supabaseClient.from("pools").select("id, name").in("id", poolIds)
+        : { data: [] };
+    const names = new Map((poolsRes.data || []).map((p) => [p.id, p.name]));
+    poolRecordsList.innerHTML = data.map((r) => {
+        const normal = r.status === "Норма";
+        const cardClass = normal ? "record normal" : "record deviation";
+        const statusIcon = normal ? "✅" : "❌";
+        const action = r.corrective_action
+            ? `<div><strong>Корректирующее действие:</strong> ${escapeHtml(r.corrective_action)}</div>`
+            : "";
+        return `
+            <article class="${cardClass}">
+                <div class="record-title">
+                    ${statusIcon} ${escapeHtml(r.measurement_date)}
+                    ${escapeHtml(String(r.measurement_time || "").slice(0, 5))}
+                    — ${escapeHtml(names.get(r.pool_id) || "Бассейн")}
+                </div>
+                <div><strong>Хлор:</strong> ${escapeHtml(r.free_chlorine ?? "—")} мг/л</div>
+                <div><strong>pH:</strong> ${escapeHtml(r.ph ?? "—")}</div>
+                <div><strong>Температура:</strong> ${escapeHtml(r.temperature ?? "—")} °C</div>
+                <div><strong>Статус:</strong> ${escapeHtml(r.status)}</div>
+                <div><strong>Ответственный:</strong> ${escapeHtml(r.responsible || "—")}</div>
+                ${action}
+            </article>
+        `;
+    }).join("");
+}
+
+// ============ БАССЕЙНЫ ============
+function poolNormsText(type) {
+    const n = POOL_NORMS[type] || POOL_NORMS.adult;
+    return `t: ${n.t[0]}–${n.t[1]} °C • хлор: ${n.cl[0]}–${n.cl[1]} • pH: ${n.ph[0]}–${n.ph[1]}`;
+}
+
+async function loadPools() {
+    if (!poolSelect) return;
+    resetSelect(poolSelect, "Загрузка бассейнов...");
+    poolSelect.disabled = true;
+    poolMap.clear();
+
+    const { data, error } = await supabaseClient
+        .from("pools")
+        .select("id, name, pool_type")
+        .eq("active", true)
+        .order("name");
+
+    if (error) {
+        showMessage(`Ошибка бассейнов: ${error.message}`, "error");
+        return;
+    }
+
+    for (const p of data || []) {
+        poolMap.set(p.id, p);
+    }
+    fillSelect(poolSelect, data || [], "Выберите бассейн");
+    poolSelect.disabled = false;
+
+    if (!data || data.length === 0) {
+        showMessage("Бассейнов нет — добавьте первый кнопкой «➕ Добавить бассейн».", "warning");
+    }
+}
+
+function showPoolInfo() {
+    if (!poolInfo) return;
+    const pool = poolMap.get(poolSelect.value);
+    if (!pool) {
+        poolInfo.innerHTML = "";
+        poolInfo.classList.add("hidden");
+        return;
+    }
+    poolInfo.innerHTML = `
+        <strong>${escapeHtml(pool.name)}</strong><br>
+        Нормы (ҚР ДСМ-67): ${poolNormsText(pool.pool_type)}
+    `;
+    poolInfo.classList.remove("hidden");
+}
+
+async function addPool() {
+    const name = prompt("Название бассейна:");
+    if (!name || !name.trim()) return;
+    const type = prompt("Тип (adult / children / open):", "adult") || "adult";
+    const ptype = ["adult", "children", "open"].includes(type) ? type : "adult";
+
+    const { error } = await supabaseClient.from("pools").insert({
+        id: createTextId(),
+        name: name.trim(),
+        pool_type: ptype
+    });
+    if (error) {
+        showMessage(`Ошибка: ${error.message}`, "error");
+        return;
+    }
+    showMessage("Бассейн добавлен ✅", "success");
+    await loadPools();
+}
+
+async function savePoolMeasurement() {
+    if (!poolSelect) return;
     hideMessage();
 
+    const pool = poolMap.get(poolSelect.value);
+    if (!pool) { showMessage("Выберите бассейн.", "warning"); return; }
+
+    const d = poolDateInput.value, t = poolTimeInput.value;
+    if (!d || !t) { showMessage("Укажите дату и время.", "warning"); return; }
+
+    const cl = chlorineInput.value.trim(), ph = phInput.value.trim(), tp = poolTempInput.value.trim();
+    if (!cl && !ph && !tp) { showMessage("Введите хотя бы один показатель.", "warning"); return; }
+
+    const n = POOL_NORMS[pool.pool_type] || POOL_NORMS.adult;
+    let ok = true;
+    const chk = (v, range) => {
+        if (v === "") return;
+        const x = Number(v.replace(",", "."));
+        if (!Number.isFinite(x) || x < range[0] || x > range[1]) ok = false;
+    };
+    chk(cl, n.cl);
+    chk(ph, n.ph);
+    chk(tp, n.t);
+
+    const status = ok ? "Норма" : "Отклонение";
+    if (!ok && !poolCorrectiveInput.value.trim()) {
+        showMessage("При отклонении — корректирующее действие.", "warning");
+        poolCorrectiveInput.focus();
+        return;
+    }
+
+    setButtonLoading(savePoolButton, true, "💾 Сохранить замер бассейна", "⏳ Сохранение...");
+
+    const { error } = await supabaseClient.from("pool_water_records").insert({
+        id: createTextId(),
+        pool_id: pool.id,
+        measurement_date: d,
+        measurement_time: t,
+        free_chlorine: cl === "" ? null : Number(cl.replace(",", ".")),
+        ph: ph === "" ? null : Number(ph.replace(",", ".")),
+        temperature: tp === "" ? null : Number(tp.replace(",", ".")),
+        status,
+        responsible: poolResponsibleInput.value.trim() || (currentProfile && currentProfile.full_name) || "",
+        corrective_action: poolCorrectiveInput.value.trim()
+    });
+
+    setButtonLoading(savePoolButton, false, "💾 Сохранить замер бассейна", "⏳ Сохранение...");
+
+    if (error) {
+        showMessage(`Ошибка: ${error.message}`, "error");
+        return;
+    }
+    chlorineInput.value = "";
+    phInput.value = "";
+    poolTempInput.value = "";
+    poolCorrectiveInput.value = "";
+    setCurrentDateAndTime();
+    showMessage(`Замер бассейна сохранён. Статус: ${status}.`, ok ? "success" : "warning");
+    await loadPoolRecords();
+}
+
+async function login() {
+    hideMessage();
     const email = emailInput.value.trim();
     const password = passwordInput.value;
 
@@ -504,12 +663,7 @@ async function login() {
     }
 
     setButtonLoading(loginButton, true, "Войти", "Вход...");
-
-    const { data, error } = await supabaseClient.auth.signInWithPassword({
-        email,
-        password
-    });
-
+    const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
     setButtonLoading(loginButton, false, "Войти", "Вход...");
 
     if (error) {
@@ -531,7 +685,6 @@ async function login() {
 
 async function register() {
     hideMessage();
-
     const fullName = registerNameInput.value.trim();
     const email = registerEmailInput.value.trim();
     const password = registerPasswordInput.value;
@@ -539,38 +692,23 @@ async function register() {
     const requestedObject = registerObjectInput.value.trim();
     const requestedDepartment = registerDepartmentInput.value.trim();
 
-    if (
-        !fullName
-        || !email
-        || !password
-        || !passwordConfirm
-        || !requestedObject
-        || !requestedDepartment
-    ) {
+    if (!fullName || !email || !password || !passwordConfirm || !requestedObject || !requestedDepartment) {
         showMessage("Заполните все поля регистрации.", "warning");
         return;
     }
-
     if (password.length < 6) {
         showMessage("Пароль должен содержать минимум 6 символов.", "warning");
         return;
     }
-
     if (password !== passwordConfirm) {
         showMessage("Введённые пароли не совпадают.", "warning");
         return;
     }
 
-    setButtonLoading(
-        registerButton,
-        true,
-        "Создать аккаунт",
-        "Регистрация..."
-    );
+    setButtonLoading(registerButton, true, "Создать аккаунт", "Регистрация...");
 
     const { error } = await supabaseClient.auth.signUp({
-        email,
-        password,
+        email, password,
         options: {
             data: {
                 full_name: fullName,
@@ -580,24 +718,17 @@ async function register() {
         }
     });
 
-    setButtonLoading(
-        registerButton,
-        false,
-        "Создать аккаунт",
-        "Регистрация..."
-    );
+    setButtonLoading(registerButton, false, "Создать аккаунт", "Регистрация...");
 
     if (error) {
         const message = error.message.toLowerCase().includes("already")
             ? "Аккаунт с такой почтой уже существует."
             : `Ошибка регистрации: ${error.message}`;
-
         showMessage(message, "error");
         return;
     }
 
     await supabaseClient.auth.signOut();
-
     registerNameInput.value = "";
     registerEmailInput.value = "";
     registerPasswordInput.value = "";
@@ -606,11 +737,7 @@ async function register() {
     registerDepartmentInput.value = "";
 
     showLogin();
-    showMessage(
-        "Аккаунт создан. Если на почту пришло письмо, подтвердите её. "
-        + "Затем дождитесь активации администратора.",
-        "success"
-    );
+    showMessage("Аккаунт создан. Если на почту пришло письмо, подтвердите её. Затем дождитесь активации администратора.", "success");
 }
 
 async function logout() {
@@ -624,16 +751,19 @@ async function startUserSession() {
     showApplication();
     setCurrentDateAndTime();
     await loadObjects();
+    await loadPools();
     await loadRecords();
+    await loadPoolRecords();
 }
 
 async function refreshData() {
     hideMessage();
     setButtonLoading(refreshButton, true, "🔄 Обновить", "⏳ Обновление...");
-
     try {
         await loadObjects();
+        await loadPools();
         await loadRecords();
+        await loadPoolRecords();
         showMessage("Данные обновлены.", "success");
     } catch (error) {
         showMessage(error.message, "error");
@@ -647,23 +777,15 @@ async function initialize() {
         if (!config.supabaseUrl || !config.supabaseKey) {
             throw new Error("В config.js не указаны адрес Supabase и publishable key.");
         }
-
         if (!window.supabase || typeof window.supabase.createClient !== "function") {
             throw new Error("Библиотека Supabase не загрузилась. Проверьте интернет.");
         }
 
-        supabaseClient = window.supabase.createClient(
-            config.supabaseUrl,
-            config.supabaseKey
-        );
-
+        supabaseClient = window.supabase.createClient(config.supabaseUrl, config.supabaseKey);
         setCurrentDateAndTime();
 
         const { data, error } = await supabaseClient.auth.getSession();
-
-        if (error) {
-            throw error;
-        }
+        if (error) throw error;
 
         if (data.session && data.session.user) {
             currentUser = data.session.user;
@@ -679,36 +801,26 @@ async function initialize() {
 
 loginButton.addEventListener("click", login);
 openRegisterButton.addEventListener("click", showRegistration);
-backToLoginButton.addEventListener("click", () => {
-    hideMessage();
-    showLogin();
-});
+backToLoginButton.addEventListener("click", () => { hideMessage(); showLogin(); });
 registerButton.addEventListener("click", register);
 
 passwordInput.addEventListener("keydown", (event) => {
-    if (event.key === "Enter") {
-        login();
-    }
+    if (event.key === "Enter") login();
 });
-
 registerPasswordConfirmInput.addEventListener("keydown", (event) => {
-    if (event.key === "Enter") {
-        register();
-    }
+    if (event.key === "Enter") register();
 });
 
 logoutButton.addEventListener("click", logout);
-
-objectSelect.addEventListener("change", async () => {
-    await loadDepartments(objectSelect.value);
-});
-
-departmentSelect.addEventListener("change", async () => {
-    await loadEquipment(departmentSelect.value);
-});
-
+objectSelect.addEventListener("change", async () => { await loadDepartments(objectSelect.value); });
+departmentSelect.addEventListener("change", async () => { await loadEquipment(departmentSelect.value); });
 equipmentSelect.addEventListener("change", showEquipmentInfo);
 saveMeasurementButton.addEventListener("click", saveMeasurement);
 refreshButton.addEventListener("click", refreshData);
+
+// ============ События бассейнов ============
+if (addPoolButton) addPoolButton.addEventListener("click", addPool);
+if (poolSelect) poolSelect.addEventListener("change", showPoolInfo);
+if (savePoolButton) savePoolButton.addEventListener("click", savePoolMeasurement);
 
 initialize();

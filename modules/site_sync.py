@@ -1,10 +1,11 @@
 # -*- coding: utf-8 -*-
-"""Синхронизация замеров HACCP с мобильного сайта (Supabase)."""
+"""Синхронизация с мобильного сайта (Supabase): замеры HACCP + бассейны."""
 import os
 import json
 import sqlite3
 import urllib.request
 import urllib.error
+import uuid
 from pathlib import Path
 
 import customtkinter as ctk
@@ -24,14 +25,12 @@ _token_cache = {"token": ""}
 
 
 def _login(log=print):
-    """Вход в Supabase по email/паролю (как на сайте)."""
     log("🔐 Входим в Supabase под вашим аккаунтом...")
     req = urllib.request.Request(
         f"{SUPABASE_URL}/auth/v1/token?grant_type=password",
         data=json.dumps({"email": SUPABASE_EMAIL, "password": SUPABASE_PASSWORD}).encode("utf-8"),
         headers={"apikey": SUPABASE_KEY, "Content-Type": "application/json"},
-        method="POST",
-    )
+        method="POST")
     with urllib.request.urlopen(req, timeout=20) as r:
         return json.load(r).get("access_token", "")
 
@@ -39,18 +38,28 @@ def _login(log=print):
 def _get_token(log=print):
     if not _token_cache["token"]:
         if not (SUPABASE_EMAIL and SUPABASE_PASSWORD):
-            raise RuntimeError(
-                "В .env не указаны SUPABASE_EMAIL и SUPABASE_PASSWORD "
-                "(почта и пароль от сайта HACCP)."
-            )
+            raise RuntimeError("В .env не указаны SUPABASE_EMAIL и SUPABASE_PASSWORD")
         _token_cache["token"] = _login(log)
     return _token_cache["token"]
 
 
+def _headers(log):
+    return {"apikey": SUPABASE_KEY, "Authorization": f"Bearer {_get_token(log)}"}
+
+
 def _sb_get(table, query="", log=print):
     url = f"{SUPABASE_URL}/rest/v1/{table}?{query}"
-    headers = {"apikey": SUPABASE_KEY, "Authorization": f"Bearer {_get_token(log)}"}
-    req = urllib.request.Request(url, headers=headers)
+    req = urllib.request.Request(url, headers=_headers(log))
+    with urllib.request.urlopen(req, timeout=30) as r:
+        return json.load(r)
+
+
+def _sb_post(table, payload, log=print):
+    url = f"{SUPABASE_URL}/rest/v1/{table}"
+    h = _headers(log)
+    h["Content-Type"] = "application/json"
+    h["Prefer"] = "return=representation"
+    req = urllib.request.Request(url, data=json.dumps(payload).encode("utf-8"), headers=h, method="POST")
     with urllib.request.urlopen(req, timeout=30) as r:
         return json.load(r)
 
@@ -60,20 +69,46 @@ def _name_map(table, log=print):
     return {str(x["id"]): x["name"] for x in rows} if isinstance(rows, list) else {}
 
 
+def _ensure_pool_tables():
+    c = sqlite3.connect(DB_PATH)
+    c.executescript("""
+    CREATE TABLE IF NOT EXISTS pools (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        pool_type TEXT DEFAULT 'adult',
+        notes TEXT
+    );
+    CREATE TABLE IF NOT EXISTS pool_water_records (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        pool_id INTEGER,
+        date TEXT,
+        time TEXT,
+        free_chlorine TEXT,
+        ph TEXT,
+        temperature TEXT,
+        status TEXT DEFAULT 'Норма',
+        responsible TEXT,
+        corrective_action TEXT,
+        created_at TEXT DEFAULT (datetime('now','localtime'))
+    );
+    """)
+    for tbl in ("pools", "pool_water_records"):
+        cols = [r[1] for r in c.execute(f"PRAGMA table_info({tbl})").fetchall()]
+        if cols and "sb_id" not in cols:
+            c.execute(f"ALTER TABLE {tbl} ADD COLUMN sb_id TEXT")
+    c.commit()
+    c.close()
+
+
 def sync_measurements(log=print):
     if not SUPABASE_URL or not SUPABASE_KEY:
         raise RuntimeError("В .env не указаны SUPABASE_URL и SUPABASE_KEY")
-    log("⬇️ Читаем замеры с сайта...")
-    records = _sb_get(
-        "haccp_temperature_records",
-        "select=*&order=measurement_date.desc,measurement_time.desc&limit=500",
-        log,
-    )
+    log("⬇️ Читаем замеры HACCP с сайта...")
+    records = _sb_get("haccp_temperature_records",
+                      "select=*&order=measurement_date.desc,measurement_time.desc&limit=500", log)
     if not isinstance(records, list):
         raise RuntimeError(f"Ответ Supabase: {records}")
     log(f"   получено записей: {len(records)}")
-
-    log("📖 Читаем справочники (объекты/подразделения/оборудование)...")
     objects = _name_map("haccp_objects", log)
     departments = _name_map("haccp_departments", log)
     equipment = _name_map("haccp_equipment", log)
@@ -87,35 +122,73 @@ def sync_measurements(log=print):
             continue
         cur.execute("SELECT 1 FROM haccp_temperature_records WHERE id=?", (rid,))
         if cur.fetchone():
-            continue  # уже есть — не дублируем
+            continue
         eq_id = str(r.get("equipment_id") or "")
-        cur.execute(
-            """INSERT INTO haccp_temperature_records
-            (id, object_name, department_name, equipment_id, equipment_name,
-             date, time, temperature, temperature_min, temperature_max,
-             status, responsible, corrective_action, created_at)
+        cur.execute("""INSERT INTO haccp_temperature_records
+            (id, object_name, department_name, equipment_id, equipment_name, date, time,
+             temperature, temperature_min, temperature_max, status, responsible, corrective_action, created_at)
             VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
-            (
-                rid,
-                objects.get(str(r.get("object_id") or ""), ""),
-                departments.get(str(r.get("department_id") or ""), ""),
-                eq_id,
-                equipment.get(eq_id, ""),
-                r.get("measurement_date") or "",
-                (r.get("measurement_time") or "")[:5],
-                str(r.get("temperature") or ""),
-                str(r.get("temperature_min") or ""),
-                str(r.get("temperature_max") or ""),
-                r.get("status") or "",
-                r.get("responsible") or "",
-                r.get("corrective_action") or "",
-                r.get("created_at") or "",
-            ),
-        )
+            (rid,
+             objects.get(str(r.get("object_id") or ""), ""),
+             departments.get(str(r.get("department_id") or ""), ""),
+             eq_id, equipment.get(eq_id, ""),
+             r.get("measurement_date") or "", (r.get("measurement_time") or "")[:5],
+             str(r.get("temperature") or ""), str(r.get("temperature_min") or ""),
+             str(r.get("temperature_max") or ""), r.get("status") or "",
+             r.get("responsible") or "", r.get("corrective_action") or "", r.get("created_at") or ""))
         new += 1
     conn.commit()
     conn.close()
-    log(f"✅ Добавлено новых замеров: {new}")
+    log(f"✅ Добавлено новых замеров HACCP: {new}")
+    return new
+
+
+def sync_pools(log=print):
+    log("🏊 Синхронизируем бассейны...")
+    _ensure_pool_tables()
+    conn = sqlite3.connect(DB_PATH)
+    cur = conn.cursor()
+    # 1) публикуем локальные бассейны в Supabase
+    for lid, name, ptype, sb_id in cur.execute("SELECT id,name,pool_type,sb_id FROM pools").fetchall():
+        if not sb_id:
+            new_id = uuid.uuid4().hex
+            try:
+                _sb_post("pools", {"id": new_id, "name": name, "pool_type": ptype or "adult"}, log)
+                cur.execute("UPDATE pools SET sb_id=? WHERE id=?", (new_id, lid))
+            except Exception as e:
+                log(f"   ⚠️ не удалось опубликовать бассейн '{name}': {e}")
+    conn.commit()
+    # 2) забираем бассейны с Supabase
+    sb_pools = _sb_get("pools", "select=id,name,pool_type", log)
+    for p in (sb_pools if isinstance(sb_pools, list) else []):
+        if not cur.execute("SELECT 1 FROM pools WHERE sb_id=?", (p["id"],)).fetchone():
+            cur.execute("INSERT INTO pools (name,pool_type,sb_id) VALUES (?,?,?)",
+                        (p["name"], p["pool_type"], p["id"]))
+    conn.commit()
+    mapping = dict(cur.execute("SELECT sb_id,id FROM pools WHERE sb_id IS NOT NULL").fetchall())
+    # 3) забираем замеры воды
+    recs = _sb_get("pool_water_records",
+                   "select=*&order=measurement_date.desc,measurement_time.desc&limit=500", log)
+    new = 0
+    for r in (recs if isinstance(recs, list) else []):
+        rid = str(r.get("id") or "")
+        if not rid:
+            continue
+        if cur.execute("SELECT 1 FROM pool_water_records WHERE sb_id=?", (rid,)).fetchone():
+            continue
+        local_pool = mapping.get(str(r.get("pool_id") or ""))
+        if not local_pool:
+            continue
+        cur.execute("""INSERT INTO pool_water_records
+            (pool_id,date,time,free_chlorine,ph,temperature,status,responsible,corrective_action,sb_id)
+            VALUES (?,?,?,?,?,?,?,?,?,?)""",
+            (local_pool, r.get("measurement_date") or "", (r.get("measurement_time") or "")[:5],
+             str(r.get("free_chlorine") or ""), str(r.get("ph") or ""), str(r.get("temperature") or ""),
+             r.get("status") or "", r.get("responsible") or "", r.get("corrective_action") or "", rid))
+        new += 1
+    conn.commit()
+    conn.close()
+    log(f"✅ Новых замеров бассейнов: {new}")
     return new
 
 
@@ -124,16 +197,10 @@ def open_sync_window():
     win.title("🔄 Сайт HACCP — синхронизация")
     win.geometry("620x460")
     win.grab_set()
-    ctk.CTkLabel(
-        win,
-        text="🔄 Синхронизация замеров с мобильного сайта",
-        font=ctk.CTkFont(size=16, weight="bold"),
-    ).pack(pady=(14, 4))
-    ctk.CTkLabel(
-        win,
-        text="Забирает новые замеры поваров из Supabase в программу.",
-        text_color="gray",
-    ).pack()
+    ctk.CTkLabel(win, text="🔄 Синхронизация с мобильного сайта",
+                 font=ctk.CTkFont(size=16, weight="bold")).pack(pady=(14, 4))
+    ctk.CTkLabel(win, text="Забирает замеры поваров (HACCP + бассейны) из Supabase.",
+                 text_color="gray").pack()
     box = ctk.CTkTextbox(win)
     box.pack(fill="both", expand=True, padx=14, pady=(12, 14))
 
@@ -147,7 +214,8 @@ def open_sync_window():
         box.delete("1.0", "end")
         try:
             n = sync_measurements(log)
-            log(f"\n🎉 Готово! Новых замеров: {n}")
+            m = sync_pools(log)
+            log(f"\n🎉 Готово! HACCP: {n} • Бассейны: {m}")
         except urllib.error.HTTPError as e:
             body = ""
             try:
@@ -161,11 +229,5 @@ def open_sync_window():
         except Exception as e:
             log(f"\n❌ Ошибка: {e}")
 
-    ctk.CTkButton(
-        win,
-        text="🔄 Забрать замеры с сайта",
-        command=run,
-        fg_color="#16A34A",
-        hover_color="#15803D",
-        height=40,
-    ).pack(pady=(0, 14))
+    ctk.CTkButton(win, text="🔄 Забрать замеры с сайта", command=run,
+                  fg_color="#16A34A", hover_color="#15803D", height=40).pack(pady=(0, 14))

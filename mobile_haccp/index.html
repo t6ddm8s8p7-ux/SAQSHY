@@ -2,329 +2,154 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-
-    <meta
-        name="viewport"
-        content="width=device-width, initial-scale=1.0"
-    >
-
-    <title>SanEpi AI — HACCP</title>
-
-    <link
-        rel="stylesheet"
-        href="styles.css"
-    >
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SanEpi AI — HACCP + Бассейны</title>
+    <link rel="stylesheet" href="styles.css">
 </head>
 
 <body>
     <main class="page">
         <section class="brand">
             <div class="brand-icon">🛡️</div>
-
             <div>
                 <h1>SanEpi AI</h1>
-                <p>Мобильный журнал HACCP</p>
+                <p>Мобильный журнал: HACCP + бассейны</p>
             </div>
         </section>
 
+        <section id="messageBox" class="message hidden"></section>
 
-        <section
-            id="messageBox"
-            class="message hidden"
-        ></section>
-
-
-        <section
-            id="loginSection"
-            class="card"
-        >
+        <section id="loginSection" class="card">
             <h2>Вход сотрудника</h2>
-
-            <label for="emailInput">
-                Электронная почта
-            </label>
-
-            <input
-                id="emailInput"
-                type="email"
-                autocomplete="email"
-                placeholder="Введите почту"
-            >
-
-            <label for="passwordInput">
-                Пароль
-            </label>
-
-            <input
-                id="passwordInput"
-                type="password"
-                autocomplete="current-password"
-                placeholder="Введите пароль"
-            >
-
-            <button
-                id="loginButton"
-                class="primary-button"
-                type="button"
-            >
-                Войти
-            </button>
-
-            <button
-                id="openRegisterButton"
-                class="link-button"
-                type="button"
-            >
-                Нет аккаунта? Зарегистрироваться
-            </button>
+            <label for="emailInput">Электронная почта</label>
+            <input id="emailInput" type="email" autocomplete="email" placeholder="Введите почту">
+            <label for="passwordInput">Пароль</label>
+            <input id="passwordInput" type="password" autocomplete="current-password" placeholder="Введите пароль">
+            <button id="loginButton" class="primary-button" type="button">Войти</button>
+            <button id="openRegisterButton" class="link-button" type="button">Нет аккаунта? Зарегистрироваться</button>
         </section>
 
-
-        <section
-            id="registerSection"
-            class="card hidden"
-        >
+        <section id="registerSection" class="card hidden">
             <h2>Регистрация сотрудника</h2>
-
-            <p class="form-help">
-                Укажите свои данные. После регистрации администратор
-                проверит заявку и откроет доступ.
-            </p>
-
+            <p class="form-help">Укажите свои данные. После регистрации администратор проверит заявку и откроет доступ.</p>
             <label for="registerNameInput">Фамилия и имя</label>
-            <input
-                id="registerNameInput"
-                type="text"
-                autocomplete="name"
-                placeholder="Например: Иван Иванов"
-            >
-
+            <input id="registerNameInput" type="text" autocomplete="name" placeholder="Например: Иван Иванов">
             <label for="registerEmailInput">Электронная почта</label>
-            <input
-                id="registerEmailInput"
-                type="email"
-                autocomplete="email"
-                placeholder="Введите свою почту"
-            >
-
+            <input id="registerEmailInput" type="email" autocomplete="email" placeholder="Введите свою почту">
             <label for="registerPasswordInput">Пароль</label>
-            <input
-                id="registerPasswordInput"
-                type="password"
-                autocomplete="new-password"
-                minlength="6"
-                placeholder="Минимум 6 символов"
-            >
-
+            <input id="registerPasswordInput" type="password" autocomplete="new-password" minlength="6" placeholder="Минимум 6 символов">
             <label for="registerPasswordConfirmInput">Повторите пароль</label>
-            <input
-                id="registerPasswordConfirmInput"
-                type="password"
-                autocomplete="new-password"
-                minlength="6"
-                placeholder="Введите пароль ещё раз"
-            >
-
+            <input id="registerPasswordConfirmInput" type="password" autocomplete="new-password" minlength="6" placeholder="Введите пароль ещё раз">
             <label for="registerObjectInput">Ваш объект</label>
-            <input
-                id="registerObjectInput"
-                type="text"
-                placeholder="Например: Rixos Water World Aktau"
-            >
-
+            <input id="registerObjectInput" type="text" placeholder="Например: Rixos Water World Aktau">
             <label for="registerDepartmentInput">Ваше подразделение</label>
-            <input
-                id="registerDepartmentInput"
-                type="text"
-                placeholder="Например: Tetis"
-            >
-
-            <button
-                id="registerButton"
-                class="primary-button"
-                type="button"
-            >
-                Создать аккаунт
-            </button>
-
-            <button
-                id="backToLoginButton"
-                class="link-button"
-                type="button"
-            >
-                Вернуться ко входу
-            </button>
+            <input id="registerDepartmentInput" type="text" placeholder="Например: Tetis">
+            <button id="registerButton" class="primary-button" type="button">Создать аккаунт</button>
+            <button id="backToLoginButton" class="link-button" type="button">Вернуться ко входу</button>
         </section>
 
-
-        <section
-            id="appSection"
-            class="hidden"
-        >
+        <section id="appSection" class="hidden">
             <section class="user-panel">
                 <div>
-                    <strong id="userName">
-                        Пользователь
-                    </strong>
-
-                    <div id="userRole">
-                        Роль
-                    </div>
+                    <strong id="userName">Пользователь</strong>
+                    <div id="userRole">Роль</div>
                 </div>
-
-                <button
-                    id="logoutButton"
-                    class="secondary-button"
-                    type="button"
-                >
-                    Выйти
-                </button>
+                <button id="logoutButton" class="secondary-button" type="button">Выйти</button>
             </section>
 
-
             <section class="card">
-                <h2>🌡️ Новый замер</h2>
+                <h2>🌡️ HACCP — замер температуры</h2>
 
-                <label for="objectSelect">
-                    Объект
-                </label>
+                <label for="objectSelect">Объект</label>
+                <select id="objectSelect"><option value="">Выберите объект</option></select>
 
-                <select id="objectSelect">
-                    <option value="">
-                        Выберите объект
-                    </option>
-                </select>
+                <label for="departmentSelect">Подразделение</label>
+                <select id="departmentSelect" disabled><option value="">Выберите подразделение</option></select>
 
+                <label for="equipmentSelect">Оборудование</label>
+                <select id="equipmentSelect" disabled><option value="">Выберите оборудование</option></select>
 
-                <label for="departmentSelect">
-                    Подразделение
-                </label>
-
-                <select
-                    id="departmentSelect"
-                    disabled
-                >
-                    <option value="">
-                        Выберите подразделение
-                    </option>
-                </select>
-
-
-                <label for="equipmentSelect">
-                    Оборудование
-                </label>
-
-                <select
-                    id="equipmentSelect"
-                    disabled
-                >
-                    <option value="">
-                        Выберите оборудование
-                    </option>
-                </select>
-
-
-                <div
-                    id="equipmentInfo"
-                    class="equipment-info hidden"
-                ></div>
-
+                <div id="equipmentInfo" class="equipment-info hidden"></div>
 
                 <div class="two-columns">
                     <div>
-                        <label for="dateInput">
-                            Дата
-                        </label>
-
-                        <input
-                            id="dateInput"
-                            type="date"
-                        >
+                        <label for="dateInput">Дата</label>
+                        <input id="dateInput" type="date">
                     </div>
-
                     <div>
-                        <label for="timeInput">
-                            Время
-                        </label>
-
-                        <input
-                            id="timeInput"
-                            type="time"
-                        >
+                        <label for="timeInput">Время</label>
+                        <input id="timeInput" type="time">
                     </div>
                 </div>
 
+                <label for="temperatureInput">Температура, °C</label>
+                <input id="temperatureInput" type="number" inputmode="decimal" step="0.1" placeholder="Например: 5">
 
-                <label for="temperatureInput">
-                    Температура, °C
-                </label>
+                <label for="responsibleInput">Ответственный</label>
+                <input id="responsibleInput" type="text" placeholder="Фамилия и имя">
 
-                <input
-                    id="temperatureInput"
-                    type="number"
-                    inputmode="decimal"
-                    step="0.1"
-                    placeholder="Например: 5"
-                >
+                <label for="correctiveActionInput">Корректирующее действие</label>
+                <textarea id="correctiveActionInput" rows="4" placeholder="Заполняется при отклонении"></textarea>
 
-
-                <label for="responsibleInput">
-                    Ответственный
-                </label>
-
-                <input
-                    id="responsibleInput"
-                    type="text"
-                    placeholder="Фамилия и имя"
-                >
-
-
-                <label for="correctiveActionInput">
-                    Корректирующее действие
-                </label>
-
-                <textarea
-                    id="correctiveActionInput"
-                    rows="4"
-                    placeholder="Заполняется при отклонении"
-                ></textarea>
-
-
-                <button
-                    id="saveMeasurementButton"
-                    class="primary-button"
-                    type="button"
-                >
-                    💾 Сохранить замер
-                </button>
+                <button id="saveMeasurementButton" class="primary-button" type="button">💾 Сохранить замер HACCP</button>
             </section>
 
+            <section class="card">
+                <h2>🏊 Бассейн — замер воды</h2>
+                <p class="form-help">Нормы по ҚР ДСМ-67 (прил. 1–2)</p>
+
+                <label for="poolSelect">Бассейн</label>
+                <select id="poolSelect"><option value="">Выберите бассейн</option></select>
+
+                <button id="addPoolButton" class="link-button" type="button">➕ Добавить бассейн</button>
+
+                <div id="poolInfo" class="equipment-info hidden"></div>
+
+                <div class="two-columns">
+                    <div>
+                        <label for="poolDateInput">Дата</label>
+                        <input id="poolDateInput" type="date">
+                    </div>
+                    <div>
+                        <label for="poolTimeInput">Время</label>
+                        <input id="poolTimeInput" type="time">
+                    </div>
+                </div>
+
+                <label for="chlorineInput">Свободный хлор, мг/л</label>
+                <input id="chlorineInput" type="number" inputmode="decimal" step="0.01" placeholder="Например: 0.4">
+
+                <label for="phInput">pH</label>
+                <input id="phInput" type="number" inputmode="decimal" step="0.1" placeholder="Например: 7.4">
+
+                <label for="poolTempInput">Температура воды, °C</label>
+                <input id="poolTempInput" type="number" inputmode="decimal" step="0.1" placeholder="Например: 25">
+
+                <label for="poolResponsibleInput">Ответственный</label>
+                <input id="poolResponsibleInput" type="text" placeholder="Фамилия и имя">
+
+                <label for="poolCorrectiveInput">Корректирующее действие</label>
+                <textarea id="poolCorrectiveInput" rows="3" placeholder="При отклонении"></textarea>
+
+                <button id="savePoolButton" class="primary-button" type="button">💾 Сохранить замер бассейна</button>
+            </section>
 
             <section class="card">
                 <div class="section-header">
-                    <h2>Последние замеры</h2>
-
-                    <button
-                        id="refreshButton"
-                        class="secondary-button"
-                        type="button"
-                    >
-                        Обновить
-                    </button>
+                    <h2>🌡️ Последние замеры HACCP</h2>
+                    <button id="refreshButton" class="secondary-button" type="button">Обновить</button>
                 </div>
+                <div id="recordsList">Записей пока нет.</div>
+            </section>
 
-                <div id="recordsList">
-                    Записей пока нет.
-                </div>
+            <section class="card">
+                <h2>🏊 Последние замеры бассейнов</h2>
+                <div id="poolRecordsList">Записей пока нет.</div>
             </section>
         </section>
     </main>
 
-
-    <script
-        src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"
-    ></script>
-
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="config.js"></script>
     <script src="app.js"></script>
 </body>
