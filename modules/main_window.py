@@ -12,6 +12,8 @@ from modules import hr_page
 from modules import settings
 from modules import site_sync
 from modules import pool_page
+from modules import hygiene_page
+from modules import violations_page
 from modules.ai_assistant_page import build_ai_assistant_page
 from modules.esen_page import build_esen_page
 from modules.haccp import build_haccp_page
@@ -162,10 +164,12 @@ class MainWindow:
                 ("hr", "👥", f" {tr('hr')}", self.open_hr),
                 ("esen", "🏥", f" {tr('esen')}", self.open_esen),
                 ("medical", "🩺", f" {tr('medical')}", self.open_medical),
+                ("hygiene", "🎓", " Гиг. обучение", self.open_hygiene),
             ]),
             ("КОНТРОЛЬ", [
                 ("haccp", "🌡️", f" {tr('haccp')}", self.open_haccp),
                 ("pool", "🏊", " Бассейны", self.open_pool),
+                ("violations", "📷", " Нарушения", self.open_violations),
                 ("inspections", "📄", f" {tr('inspections')}", self.open_inspections),
                 ("ses", "🏛️", " СЭС", self.open_ses),
                 ("dd", "🛡️", " ДД", self.open_dd),
@@ -202,7 +206,7 @@ class MainWindow:
         bottom.pack(fill="x", padx=14, pady=(0, 14))
         ctk.CTkLabel(bottom, text="🌐 " + tr("language"), font=(FONT, 11, "bold"),
                      text_color=TEXT_MUTED).pack(anchor="w", pady=(0, 3))
-        current_name = LANGUAGES.get(get_language(), "🇷🇺 Русский")
+        current_name = LANGUAGES.get(get_language(), "🇷 Русский")
         self.language = ctk.StringVar(value=current_name)
         ctk.CTkOptionMenu(
             bottom, values=list(LANGUAGES.values()), variable=self.language,
@@ -286,6 +290,9 @@ class MainWindow:
     def open_medical(self):
         self._show(f"🩺 {tr('medical')}", build_medical_page)
 
+    def open_hygiene(self):
+        self._show("🎓 Гигиеническое обучение", hygiene_page.build_hygiene_page)
+
     def open_laws(self):
         self._show(f"📑 {tr('laws')}", build_laws_page)
 
@@ -294,6 +301,9 @@ class MainWindow:
 
     def open_pool(self):
         self._show("🏊 Бассейны", pool_page.build_pool_page)
+
+    def open_violations(self):
+        self._show("📷 Нарушения", violations_page.build_violations_page)
 
     def open_suppliers(self):
         self._show(f"📦 {tr('suppliers')}", build_suppliers_page)
