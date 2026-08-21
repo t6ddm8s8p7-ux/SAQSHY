@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 """Журнал нарушений с фотофиксацией — 4 языка."""
+import json
 import os
 import shutil
 import sqlite3
@@ -73,19 +74,35 @@ def ensure_table():
 
 
 def get_locations():
-    """Собирает объекты только из раздела СЭС (таблица ses_objects)."""
+    """Объекты только из раздела СЭС — из того же файла ses_objects.json (один источник)."""
     locs = set()
-    c = db()
+    p = PROJECT_ROOT / "database" / "ses_objects.json"
     try:
-        cols = [r[1] for r in c.execute("PRAGMA table_info(ses_objects)").fetchall()]
-        col = next((x for x in ("name", "object_name", "title", "object") if x in cols), None)
-        if col:
-            for (n,) in c.execute(f"SELECT {col} FROM ses_objects").fetchall():
-                if n and str(n).strip():
-                    locs.add(str(n).strip())
-    except sqlite3.Error:
-        pass
-    c.close()
+        with open(p, "r", encoding="utf-8-sig") as f:
+            items = json.load(f)
+    except Exception:
+        items = []
+    for m in items if isinstance(items, list) else []:
+        name = (m.get("name") or "").strip()
+        if name:
+            locs.add(name)
+        for ch in m.get("children", []) or []:
+            cname = (ch.get("name") or "").strip()
+            if cname:
+                locs.add(cname)
+    if not locs:
+        # запасной вариант: старая таблица ses_objects
+        c = db()
+        try:
+            cols = [r[1] for r in c.execute("PRAGMA table_info(ses_objects)").fetchall()]
+            col = next((x for x in ("name", "object_name", "title", "object") if x in cols), None)
+            if col:
+                for (n,) in c.execute(f"SELECT {col} FROM ses_objects").fetchall():
+                    if n and str(n).strip():
+                        locs.add(str(n).strip())
+        except sqlite3.Error:
+            pass
+        c.close()
     return sorted(locs)
 
 

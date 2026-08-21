@@ -1,292 +1,194 @@
+# -*- coding: utf-8 -*-
+"""Загрузка HR Excel: понимает строки-отделы и делит сотрудников по отделам."""
 import json
-import os
-import time
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
+import re
+from pathlib import Path
+
+from tkinter import filedialog, messagebox
+
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+HR_FILE = PROJECT_ROOT / "database" / "hr_employees.json"
+
+DEP_KEYS = ("отдел", "подраздел", "департамент", "служба", "сектор", "цех", "управлен", "бөлім", "department")
 
 
-def close_intro(driver):
-    """Закрывает подсказки сайта на казахском, русском или английском."""
-    wait = WebDriverWait(driver, 5)
+def norm(s):
+    return str(s if s is not None else "").strip().lower().replace("ё", "е")
+
+
+def _is_num(v):
+    return bool(re.fullmatch(r"[\d\-\+\. ]+", v))
+
+
+def _is_dash(v):
+    return bool(re.fullmatch(r"[\-\—\_\s]+", v))
+
+
+def _looks_fio(v):
+    words = v.split()
+    return len(words) >= 2 and not _is_num(v) and sum(1 for w in words if w[:1].isupper()) >= 2
+
+
+def _read_rows(path):
+    path = str(path)
+    if path.lower().endswith(".csv"):
+        import csv
+        with open(path, "r", encoding="utf-8-sig", errors="ignore") as f:
+            return [row for row in csv.reader(f)]
     try:
-        next_btn = wait.until(
-            EC.element_to_be_clickable((By.XPATH,
-                "//*[contains(text(),'Келесі') or contains(text(),'Далее') or contains(text(),'Next')]"
-            ))
-        )
-        driver.execute_script("arguments[0].click();", next_btn)
-        time.sleep(1)
-    except Exception:
-        pass
-    try:
-        done_btn = wait.until(
-            EC.element_to_be_clickable((By.XPATH,
-                "//*[contains(text(),'Аяқтау') or contains(text(),'Аяқталды') "
-                "or contains(text(),'Завершить') or contains(text(),'Finish')]"
-            ))
-        )
-        driver.execute_script("arguments[0].click();", done_btn)
-        time.sleep(1)
-    except Exception:
-        pass
+        import pandas as pd
+        return pd.read_excel(path, header=None, dtype=str).fillna("").values.tolist()
+    except ImportError:
+        from openpyxl import load_workbook
+        wb = load_workbook(path, read_only=True, data_only=True)
+        ws = wb.active
+        rows = [["" if c is None else str(c) for c in row] for row in ws.iter_rows(values_only=True)]
+        wb.close()
+        return rows
 
 
-def read_current_page(driver, page_number=1):
-    for attempt in range(3):
-        try:
-            employees_data = []
-            WebDriverWait(driver, 45).until(
-                EC.presence_of_element_located((By.TAG_NAME, "table"))
-            )
-            WebDriverWait(driver, 45).until(
-                lambda d: d.execute_script("""
-                    const rows = document.querySelectorAll("table tbody tr");
-                    if (!rows.length) return false;
-                    const text = Array.from(rows)
-                        .map(row => row.innerText.trim())
-                        .join(" ");
-                    return text.length > 20;
-                """)
-            )
-            time.sleep(2)
-            rows_data = driver.execute_script("""
-                const rows = document.querySelectorAll("table tbody tr");
-                return Array.from(rows).map(row => {
-                    const cells = row.querySelectorAll("td");
-                    return Array.from(cells).map(cell => cell.innerText.trim());
-                });
-            """)
-            print("=" * 60)
-            print("СОТРУДНИКИ / ҚЫЗМЕТКЕРЛЕР")
-            print("=" * 60)
-            for index, cols in enumerate(rows_data, start=1):
-                while len(cols) < 7:
-                    cols.append("-")
-                emp = {
-                    "fio": cols[0],
-                    "workplace": cols[1],
-                    "position": cols[2],
-                    "medical_book": cols[3],
-                    "group": cols[4],
-                    "valid_until": cols[5],
-                    "status": cols[6],
-                    "page_number": page_number,
-                    "row_number": index,
-                    "raw_data": cols,
-                }
-                if not emp["fio"]:
-                    emp["fio"] = f"Строка e-SEN без ФИО / страница {page_number}, строка {index}"
-                    emp["status"] = "Нет информации"
-                    emp["no_fio"] = True
-                else:
-                    emp["no_fio"] = False
-                employees_data.append(emp)
-                print("ФИО:", emp["fio"])
-            print(f"✅ На странице найдено: {len(employees_data)}")
-            return employees_data
-        except Exception as e:
-            print(f"⚠️ Ошибка чтения страницы. Попытка {attempt + 1}/3")
-            print(e)
-            time.sleep(3)
-    print("❌ Не удалось прочитать страницу после 3 попыток.")
-    return []
-
-
-def get_pagination_text(driver):
-    try:
-        items = driver.find_elements(
-            By.XPATH,
-            "//*[contains(text(),'из') or contains(text(),'of') "
-            "or contains(text(),'ішінен') or contains(text(),'дан')]"
-        )
-    except Exception:
-        return ""
-    for item in items:
-        text = item.text.strip()
-        if text:
-            return text
-    return ""
-
-
-def get_next_button(driver):
-    try:
-        buttons = driver.find_elements(By.TAG_NAME, "button")
-    except Exception:
+def _dept_row_value(row):
+    """Строка-отдел: вся строка заполнена одним названием (или одна ячейка со словом «отдел»)."""
+    vals = [str(c).strip() for c in row if str(c).strip()]
+    if not vals or all(_is_dash(v) for v in vals):
         return None
-    for btn in buttons:
-        try:
-            label = (btn.get_attribute("aria-label") or "").lower()
-            title = (btn.get_attribute("title") or "").lower()
-            if (
-                "next page" in label
-                or "go to next page" in label
-                or "next page" in title
-                or "go to next page" in title
-                or "келесі" in label
-                or "келесі" in title
-                or "далее" in label
-                or "далее" in title
-                or "следующ" in label
-                or "следующ" in title
-            ):
-                return btn
-        except Exception:
-            continue
-    try:
-        candidates = driver.find_elements(
-            By.XPATH,
-            "//button[.//*[name()='svg']]"
-        )
-        if candidates:
-            return candidates[-1]
-    except Exception:
-        pass
+    if len(set(v.lower() for v in vals)) == 1 and len(vals) >= 2:
+        return vals[0]
+    if len(vals) == 1 and len(vals[0].split()) >= 2 and any(k in vals[0].lower() for k in DEP_KEYS):
+        return vals[0]
     return None
 
 
-def is_next_disabled(btn):
-    try:
-        if btn.get_attribute("disabled"):
-            return True
-        if btn.get_attribute("aria-disabled") == "true":
-            return True
-        class_name = (btn.get_attribute("class") or "").lower()
-        if "disabled" in class_name:
-            return True
-    except Exception:
-        return False
-    return False
+def _is_fio_header(c):
+    return ("фио" in c or "сотрудник" in c or "фамилия" in c or "ф.и.о" in c
+            or "тегі" in c or "аты" in c or "қызметкер" in c or "full name" in c)
 
 
-def click_next_page(driver):
-    for attempt in range(3):
-        try:
-            old_text = get_pagination_text(driver)
-            next_btn = get_next_button(driver)
-            if not next_btn:
-                print("✅ Кнопка следующей страницы не найдена.")
-                return False
-            if is_next_disabled(next_btn):
-                print("✅ Кнопка следующей страницы отключена.")
-                return False
-            driver.execute_script(
-                "arguments[0].scrollIntoView({block:'center'});",
-                next_btn
-            )
-            time.sleep(1)
-            next_btn = get_next_button(driver)
-            if not next_btn or is_next_disabled(next_btn):
-                print("✅ Следующая страница недоступна.")
-                return False
-            driver.execute_script("arguments[0].click();", next_btn)
-            try:
-                WebDriverWait(driver, 20).until(
-                    lambda d: get_pagination_text(d) != old_text
-                )
-            except Exception:
-                pass
-            time.sleep(4)
-            new_text = get_pagination_text(driver)
-            if new_text == old_text:
-                print("✅ Пагинация не изменилась. Вероятно, последняя страница.")
-                return False
-            return True
-        except Exception as e:
-            print(f"⚠️ Ошибка перехода ({attempt + 1}/3)")
-            print(e)
-            time.sleep(3)
-    print("⚠️ Не удалось перейти дальше после 3 попыток.")
-    return False
+def _is_pos_header(c):
+    return ("должност" in c or "лауазым" in c or "позици" in c or "position" in c)
 
 
-def finish_reading(all_employees):
-    unique = {}
-    for emp in all_employees:
-        fio = emp.get("fio", "").strip()
-        med = emp.get("medical_book", "").strip()
-        page = emp.get("page_number", "")
-        row = emp.get("row_number", "")
-        if not fio and not med:
+def _is_dep_header(c):
+    return any(k in c for k in DEP_KEYS)
+
+
+def _find_header(rows):
+    for i, row in enumerate(rows[:10]):
+        cells = [norm(c) for c in row]
+        if any(_is_fio_header(c) for c in cells):
+            idx = {"fio": None, "pos": None, "dep": None}
+            for j, c in enumerate(cells):
+                if not c:
+                    continue
+                if idx["fio"] is None and _is_fio_header(c):
+                    idx["fio"] = j
+                elif idx["pos"] is None and _is_pos_header(c):
+                    idx["pos"] = j
+                elif idx["dep"] is None and _is_dep_header(c):
+                    idx["dep"] = j
+            if idx["fio"] is not None:
+                return idx, i
+    return None, -1
+
+
+def parse_employees(rows):
+    emps, seen = [], set()
+
+    # ----- формат с шапкой (ФИО / Должность / Отдел) -----
+    idx, header_i = _find_header(rows)
+    if header_i >= 0:
+        for r in rows[header_i + 1:]:
+            def cell(k):
+                j = idx.get(k)
+                if j is None or j >= len(r):
+                    return ""
+                return str(r[j]).strip()
+            fio = cell("fio")
+            if not fio or not _looks_fio(fio):
+                continue
+            key = fio.lower()
+            if key in seen:
+                continue
+            seen.add(key)
+            dep = cell("dep")
+            emps.append({"Сотрудник": fio, "Должность": cell("pos"),
+                         "Отдел": dep, "Подразделение": dep})
+        return emps
+
+    # ----- формат со строками-отделами (ваш Excel) -----
+    current = ""
+    for row in rows:
+        dep = _dept_row_value(row)
+        if dep:
+            current = dep
             continue
-        if emp.get("no_fio"):
-            key = f"NO_FIO_{page}{row}{med}"
-        else:
-            key = f"{fio}_{med}"
-        unique[key] = emp
-    result = list(unique.values())
-    print(f"✅ Всего уникальных сотрудников e-SEN: {len(result)}")
-    return result
+        texts = [(j, str(c).strip()) for j, c in enumerate(row) if str(c).strip()]
+        if not texts:
+            continue
+        fio_j = None
+        for j, v in texts:
+            if _looks_fio(v):
+                fio_j = j
+                break
+        if fio_j is None:
+            continue
+        fio = dict(texts)[fio_j]
+        key = fio.lower()
+        if key in seen:
+            continue
+        seen.add(key)
+
+        pos, state, iin = "", "", ""
+        for j, v in texts:
+            if j == fio_j:
+                continue
+            if _is_num(v):
+                if len(v) >= 12 and not iin:
+                    iin = v
+                continue
+            if not pos:
+                pos = v
+            elif not state:
+                state = v
+        emps.append({"Сотрудник": fio, "Должность": pos,
+                     "Отдел": current, "Подразделение": current,
+                     "Состояние": state, "ИИН": iin})
+    return emps
 
 
-def read_all_pages(driver):
-    all_employees = []
-    page = 1
-    max_pages = 200
-    while page <= max_pages:
-        print(f"\n📄 Читаю страницу: {page}")
-        current_page_employees = read_current_page(driver, page)
-        all_employees.extend(current_page_employees)
-        moved = click_next_page(driver)
-        if not moved:
-            print("✅ Последняя страница успешно прочитана.")
-            break
-        page += 1
-    return finish_reading(all_employees)
-
-
-def save_employees(employees_data, force=False):
-    os.makedirs("database", exist_ok=True)
-    file_path = "database/esen_employees.json"
-    old_count = 0
-    if os.path.exists(file_path):
-        try:
-            with open(file_path, "r", encoding="utf-8-sig") as f:
-                old_data = json.load(f)
-                old_count = len(old_data) if isinstance(old_data, list) else 0
-        except Exception:
-            old_count = 0
-    new_count = len(employees_data)
-    if old_count > 0 and new_count < old_count and not force:
-        print("⚠️ ВНИМАНИЕ: новая база меньше предыдущей.")
-        print(f"Предыдущая база: {old_count}")
-        print(f"Новая база: {new_count}")
-        print("❌ Сохранение отменено, чтобы не потерять данные.")
-        return False
-    with open(file_path, "w", encoding="utf-8") as f:
-        json.dump(employees_data, f, ensure_ascii=False, indent=2)
-    print(f"✅ Сохранено сотрудников: {new_count}")
-    return True
-
-
-def open_employees(driver):
-    WebDriverWait(driver, 20).until(
-        EC.presence_of_element_located((By.TAG_NAME, "body"))
+def choose_excel():
+    path = filedialog.askopenfilename(
+        title="Выберите файл HR (Excel или CSV)",
+        filetypes=[("Excel/CSV", "*.xlsx *.xls *.csv"), ("Все файлы", "*.*")],
     )
-    time.sleep(2)
-    close_intro(driver)
+    if not path:
+        return None
+    try:
+        rows = _read_rows(path)
+    except Exception as e:
+        messagebox.showerror("Ошибка чтения", f"Не удалось прочитать файл:\n{e}")
+        return None
 
-    # Страница сотрудников: kk или ru
-    opened = False
-    for url in [
-        "https://e-sen.kz/kk/employees/250128",
-        "https://e-sen.kz/ru/employees/250128",
-    ]:
-        driver.get(url)
-        time.sleep(7)
-        try:
-            WebDriverWait(driver, 15).until(
-                EC.presence_of_element_located((By.TAG_NAME, "table"))
-            )
-            print(f"✅ Открыта страница сотрудников: {url}")
-            opened = True
-            break
-        except Exception:
-            print(f"⚠️ Нет таблицы на {url}, пробую другой язык...")
-    if not opened:
-        print("❌ Страница сотрудников не открылась.")
-        return driver
+    employees = parse_employees(rows)
+    if not employees:
+        messagebox.showwarning("Внимание", "Сотрудники не найдены. Проверьте, что в файле есть ФИО.")
+        return None
 
-    employees_data = read_all_pages(driver)
-    save_employees(employees_data)
-    return driver
+    HR_FILE.parent.mkdir(parents=True, exist_ok=True)
+    with open(HR_FILE, "w", encoding="utf-8") as f:
+        json.dump(employees, f, ensure_ascii=False, indent=2)
+
+    deps = len(set(e["Отдел"] for e in employees if e["Отдел"]))
+    messagebox.showinfo("Успех", f"✅ Загружено сотрудников: {len(employees)}\n🏢 Отделов: {deps}")
+    return employees
+
+
+def load_hr_employees():
+    if not HR_FILE.exists():
+        return []
+    try:
+        with open(HR_FILE, "r", encoding="utf-8-sig") as f:
+            data = json.load(f)
+        return data if isinstance(data, list) else []
+    except Exception:
+        return []

@@ -137,7 +137,7 @@ def open_lab_window(parent, item_text, is_high):
     scroll = ctk.CTkScrollableFrame(window, corner_radius=12)
     scroll.pack(fill="both", expand=True, padx=16, pady=(0, 16))
 
-    cats = find_lab_categories(item_text)
+    cats = find_lab_categories(item_text, is_high)
 
     ctk.CTkLabel(
         scroll,
