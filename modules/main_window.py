@@ -14,6 +14,7 @@ from modules import site_sync
 from modules import pool_page
 from modules import hygiene_page
 from modules import violations_page
+from modules import lab_page
 from modules.ai_assistant_page import build_ai_assistant_page
 from modules.esen_page import build_esen_page
 from modules.haccp import build_haccp_page
@@ -170,6 +171,7 @@ class MainWindow:
                 ("haccp", "🌡️", f" {tr('haccp')}", self.open_haccp),
                 ("pool", "🏊", " Бассейны", self.open_pool),
                 ("violations", "📷", " Нарушения", self.open_violations),
+                ("lab", "🧪", " Лаборатория", self.open_lab),
                 ("inspections", "📄", f" {tr('inspections')}", self.open_inspections),
                 ("ses", "🏛️", " СЭС", self.open_ses),
                 ("dd", "🛡️", " ДД", self.open_dd),
@@ -304,6 +306,9 @@ class MainWindow:
 
     def open_violations(self):
         self._show("📷 Нарушения", violations_page.build_violations_page)
+
+    def open_lab(self):
+        self._show("🧪 Лабораторные исследования", lab_page.build_lab_page)
 
     def open_suppliers(self):
         self._show(f"📦 {tr('suppliers')}", build_suppliers_page)
