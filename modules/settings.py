@@ -7,16 +7,6 @@ from pathlib import Path
 from tkinter import messagebox
 
 from modules.translations import LANGUAGES, get_language, set_language, tr
-from modules.ui_translations import get_ui_translation
-
-
-def _find_main_window(widget):
-    current = widget
-    while current is not None:
-        if hasattr(current, '_build_sidebar') and hasattr(current, 'sidebar'):
-            return current
-        current = current.master if hasattr(current, 'master') else None
-    return None
 
 
 def _save_setting(key, value):
@@ -47,11 +37,12 @@ def _load_setting(key, default=None):
         return default
 
 
-def build_settings_page(parent):
+# ВАЖНО: добавлен аргумент main_window
+def build_settings_page(parent, main_window):
     lang = get_language()
     
     print("=== НАЧАЛО build_settings_page ===")
-    print(f"Язык: {lang}")
+    print(f"Текущий язык: {lang}")
     
     # Заголовок
     ctk.CTkLabel(
@@ -100,20 +91,20 @@ def build_settings_page(parent):
         for code, name in LANGUAGES.items():
             if name == selected:
                 set_language(code)
-                main_window = _find_main_window(parent)
-                if main_window:
-                    main_window.sidebar.destroy()
-                    main_window.resize_grip.destroy()
-                    main_window.content.destroy()
-                    main_window.nav_buttons = {}
-                    main_window.is_resizing = False
-                    main_window._build_ui()
-                    main_window._set_active("settings")
-                    main_window.open_settings()
+                
+                # ТЕПЕРЬ ЭТО РАБОТАЕТ НА 100%, так как main_window передан напрямую
+                main_window.sidebar.destroy()
+                main_window.resize_grip.destroy()
+                main_window.content.destroy()
+                main_window.nav_buttons = {}
+                main_window.is_resizing = False
+                main_window._build_ui()
+                main_window._set_active("settings")
+                main_window.open_settings()
+                
                 messagebox.showinfo("SanEpi AI", f"Язык изменён: {name}")
                 break
     
-    # КНОПКА ПРИМЕНИТЬ - ПРОСТОЙ ТЕКСТ БЕЗ tr()
     ctk.CTkButton(
         lang_frame,
         text="💾 Қолдану / Применить",
@@ -231,10 +222,9 @@ def build_settings_page(parent):
         text_color="#fec50c"
     ).pack(anchor="w", padx=20, pady=(15, 10))
     
-    # --- ПАРОЛЬ ---
     ctk.CTkButton(
         security_frame,
-        text=" Құпия сөзді өзгерту / Изменить пароль",
+        text="🔑 Құпия сөзді өзгерту / Изменить пароль",
         width=350,
         height=42,
         fg_color="#7c3aed",
@@ -242,7 +232,6 @@ def build_settings_page(parent):
         command=lambda: messagebox.showinfo("SanEpi AI", "Функция в разработке")
     ).pack(pady=10)
     
-    # --- АВТОБЛОКИРОВКА ---
     lock_frame = ctk.CTkFrame(security_frame, fg_color="transparent")
     lock_frame.pack(fill="x", padx=20, pady=10)
     
@@ -277,13 +266,12 @@ def build_settings_page(parent):
         command=save_lock
     ).pack(pady=10)
     
-    # --- ЛОГИРОВАНИЕ ---
     log_frame = ctk.CTkFrame(security_frame, fg_color="transparent")
     log_frame.pack(fill="x", padx=20, pady=10)
     
     ctk.CTkLabel(
         log_frame,
-        text=" Логтау / Логирование:",
+        text="📋 Логтау / Логирование:",
         font=("Arial", 14),
         anchor="w"
     ).pack(fill="x", padx=10, pady=5)

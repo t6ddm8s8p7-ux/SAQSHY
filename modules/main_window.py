@@ -346,9 +346,9 @@ class MainWindow:
     def open_letters(self): self._show("letters", build_letters_page)
     def open_reports(self): self._show("reports", build_reports_page)
     
-    # Метод для открытия страницы настроек
+    # ИСПРАВЛЕНО: Передаем self (экземпляр MainWindow) вторым аргументом
     def open_settings(self): 
-        self._show("settings", settings.build_settings_page)
+        self._show("settings", lambda parent: settings.build_settings_page(parent, self))
 
     def run(self):
         self.app.mainloop()
