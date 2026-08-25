@@ -436,8 +436,20 @@ def build_medical_page(parent):
             command=lambda v=value: set_filter(v),
         ).pack(side="left", padx=6, pady=8)
 
-    table = ctk.CTkScrollableFrame(parent, corner_radius=14)
-    table.pack(fill="both", expand=True, padx=20, pady=15)
+    # ДОБАВЛЕНА ГОРИЗОНТАЛЬНАЯ ПРОКРУТКА ДЛЯ ТАБЛИЦЫ
+    table_scroll = ctk.CTkScrollableFrame(
+        parent, 
+        corner_radius=14, 
+        orientation="horizontal",  # Горизонтальная прокрутка
+        scrollbar_button_color="#0d3d4b",
+        scrollbar_button_hover_color="#155e75",
+    )
+    table_scroll.pack(fill="both", expand=True, padx=20, pady=15)
+
+    # Внутренний контейнер для таблицы (фиксированная минимальная ширина)
+    table = ctk.CTkFrame(table_scroll, fg_color="transparent")
+    table.pack(fill="both", expand=True)
+    table.configure(width=1400)  # Минимальная ширина таблицы
 
     headers = [
         tr("fio"),
@@ -448,6 +460,9 @@ def build_medical_page(parent):
         tr("days_left"),
         tr("status"),
     ]
+    
+    # Фиксированные ширины колонок, чтобы текст не обрезался
+    col_widths = [300, 220, 250, 150, 120, 100, 150]
 
     def clear_table():
         for widget in table.winfo_children():
@@ -456,11 +471,13 @@ def build_medical_page(parent):
     def render_table():
         clear_table()
 
-        for col, header in enumerate(headers):
+        for col, (header, width) in enumerate(zip(headers, col_widths)):
             ctk.CTkLabel(
                 table,
                 text=header,
                 font=("Arial", 15, "bold"),
+                width=width,
+                anchor="w"
             ).grid(row=0, column=col, padx=12, pady=8, sticky="w")
 
         search = search_var.get().lower().strip()
@@ -509,7 +526,7 @@ def build_medical_page(parent):
                 status_text,
             ]
 
-            for col, value in enumerate(values):
+            for col, (value, width) in enumerate(zip(values, col_widths)):
                 if col == 0:
                     fio_frame = ctk.CTkFrame(table, fg_color="transparent")
                     fio_frame.grid(
@@ -522,7 +539,7 @@ def build_medical_page(parent):
                     ctk.CTkButton(
                         fio_frame,
                         text=str(value),
-                        width=220,
+                        width=250,  # Фиксированная ширина для кнопки с ФИО
                         anchor="w",
                     ).pack(side="left")
 
@@ -540,6 +557,9 @@ def build_medical_page(parent):
                     ctk.CTkLabel(
                         table,
                         text=str(value),
+                        font=("Arial", 14),
+                        width=width,
+                        anchor="w",
                         text_color=color if col == 6 else None,
                     ).grid(
                         row=row,
@@ -559,4 +579,7 @@ def build_medical_page(parent):
             ).grid(row=1, column=0, padx=12, pady=20, sticky="w")
 
     search_var.trace_add("write", lambda *args: render_table())
+    filter_var.trace_add("write", lambda *args: render_table())
+    department_var.trace_add("write", lambda *args: render_table())
+    
     render_table()

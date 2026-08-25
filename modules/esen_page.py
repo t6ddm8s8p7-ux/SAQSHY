@@ -5,11 +5,23 @@ from modules.translations import tr
 
 
 def make_stat_card(parent, title, value, color):
-    card = ctk.CTkFrame(parent, corner_radius=14)
-    card.grid_columnconfigure(0, weight=1)
-
-    ctk.CTkLabel(card, text=title, font=("Arial", 14, "bold"), text_color=color).pack(pady=(10, 5))
-    ctk.CTkLabel(card, text=str(value), font=("Arial", 24, "bold")).pack(pady=(0, 10))
+    card = ctk.CTkFrame(parent, corner_radius=14, height=100)
+    card.pack_propagate(False)  # Запрещаем сжатие
+    
+    ctk.CTkLabel(
+        card, 
+        text=title, 
+        font=("Arial", 11, "bold"),  # Уменьшили шрифт
+        text_color=color,
+        wraplength=160,  # Разрешаем перенос текста
+        justify="center"  # Центрируем текст
+    ).pack(pady=(10, 5), padx=10)
+    
+    ctk.CTkLabel(
+        card, 
+        text=str(value), 
+        font=("Arial", 28, "bold"),  # Увеличили цифру
+    ).pack(pady=(0, 10))
 
     return card
 
@@ -38,8 +50,8 @@ def build_esen_page(parent):
     stats_frame.pack(fill="x", padx=20, pady=10)
 
     cards = [
-        (f"👥 {tr('total_esen')}", total, "#60a5fa"),
-        (f"🟢 {tr('exists_in_hr')}", matched, "#22c55e"),
+        (f" {tr('total_esen')}", total, "#60a5fa"),
+        (f" {tr('exists_in_hr')}", matched, "#22c55e"),
         (f"🟡 {tr('not_in_hr')}", only_esen, "#f59e0b"),
         (f"⏰ {tr('expiring')}", expiring_count, "#f97316"),
         (f"🔄 {tr('medbooks')}", duplicate_count, "#3b82f6"),
@@ -48,8 +60,12 @@ def build_esen_page(parent):
 
     for i, (title, value, color) in enumerate(cards):
         card = make_stat_card(stats_frame, title, value, color)
-        card.grid(row=0, column=i, padx=8, pady=8, sticky="nsew")
+        card.grid(row=0, column=i, padx=6, pady=8, sticky="nsew")
         stats_frame.grid_columnconfigure(i, weight=1)
+    
+    # Добавляем минимальное количество колонок
+    for i in range(len(cards)):
+        stats_frame.grid_columnconfigure(i, weight=1, minsize=140)
 
     action_frame = ctk.CTkFrame(parent, corner_radius=14)
     action_frame.pack(fill="x", padx=20, pady=10)
@@ -112,7 +128,7 @@ def build_esen_page(parent):
         box.configure(state="disabled")
 
     actions = [
-        (f"🔄 {tr('update_esen')}", refresh_esen),
+        (f" {tr('update_esen')}", refresh_esen),
         (f"⚖️ {tr('compare_with_hr')}", compare_with_hr),
         (f"🟡 {tr('not_in_hr')}", show_only_esen),
         (f"➕ {tr('add_employees')}", None),
@@ -123,10 +139,16 @@ def build_esen_page(parent):
         ctk.CTkButton(
             action_frame,
             text=text,
-            width=220,
+            width=200,  # Уменьшили ширину
             height=42,
             command=command
-        ).grid(row=0, column=i, padx=10, pady=10)
+        ).grid(row=0, column=i, padx=8, pady=10)
+    
+    action_frame.grid_columnconfigure(0, weight=1)
+    action_frame.grid_columnconfigure(1, weight=1)
+    action_frame.grid_columnconfigure(2, weight=1)
+    action_frame.grid_columnconfigure(3, weight=1)
+    action_frame.grid_columnconfigure(4, weight=1)
 
     search_var = ctk.StringVar(value="")
 
@@ -138,8 +160,20 @@ def build_esen_page(parent):
     )
     search_entry.pack(fill="x", padx=20, pady=(5, 10))
 
-    table = ctk.CTkScrollableFrame(parent, corner_radius=14)
-    table.pack(fill="both", expand=True, padx=20, pady=15)
+    # ДОБАВЛЕНА ГОРИЗОНТАЛЬНАЯ ПРОКРУТКА
+    table_scroll = ctk.CTkScrollableFrame(
+        parent, 
+        corner_radius=14, 
+        orientation="horizontal",
+        scrollbar_button_color="#0d3d4b",
+        scrollbar_button_hover_color="#155e75",
+    )
+    table_scroll.pack(fill="both", expand=True, padx=20, pady=15)
+
+    # Внутренний контейнер с фиксированной шириной
+    table = ctk.CTkFrame(table_scroll, fg_color="transparent")
+    table.pack(fill="both", expand=True)
+    table.configure(width=1300)  # Минимальная ширина таблицы
 
     headers = [
         tr("fio"),
@@ -148,6 +182,9 @@ def build_esen_page(parent):
         tr("period"),
         tr("status"),
     ]
+    
+    # Фиксированные ширины колонок
+    col_widths = [300, 250, 150, 200, 200]
 
     def clear_table():
         for widget in table.winfo_children():
@@ -156,11 +193,13 @@ def build_esen_page(parent):
     def render_table():
         clear_table()
 
-        for col, header in enumerate(headers):
+        for col, (header, width) in enumerate(zip(headers, col_widths)):
             ctk.CTkLabel(
                 table,
                 text=header,
-                font=("Arial", 15, "bold")
+                font=("Arial", 15, "bold"),
+                width=width,
+                anchor="w"
             ).grid(row=0, column=col, padx=12, pady=8, sticky="w")
 
         search = search_var.get().lower().strip()
@@ -181,24 +220,30 @@ def build_esen_page(parent):
             ctk.CTkButton(
                 table,
                 text=emp.get("fio", "-"),
-                width=260,
+                width=col_widths[0],
                 anchor="w"
             ).grid(row=row, column=0, padx=10, pady=5, sticky="w")
 
             ctk.CTkLabel(
                 table,
-                text=emp.get("position", "-")
-            ).grid(row=row, column=1, padx=10, sticky="w")
+                text=emp.get("position", "-"),
+                width=col_widths[1],
+                anchor="w"
+            ).grid(row=row, column=1, padx=10, pady=5, sticky="w")
 
             ctk.CTkLabel(
                 table,
-                text=emp.get("medical_book", "-")
-            ).grid(row=row, column=2, padx=10, sticky="w")
+                text=emp.get("medical_book", "-"),
+                width=col_widths[2],
+                anchor="w"
+            ).grid(row=row, column=2, padx=10, pady=5, sticky="w")
 
             ctk.CTkLabel(
                 table,
-                text=emp.get("valid_until", "-")
-            ).grid(row=row, column=3, padx=10, sticky="w")
+                text=emp.get("valid_until", "-"),
+                width=col_widths[3],
+                anchor="w"
+            ).grid(row=row, column=3, padx=10, pady=5, sticky="w")
 
             status = str(emp.get("status", "-"))
 
@@ -210,8 +255,10 @@ def build_esen_page(parent):
             ctk.CTkLabel(
                 table,
                 text=status,
-                text_color=color
-            ).grid(row=row, column=4, padx=10, sticky="w")
+                text_color=color,
+                width=col_widths[4],
+                anchor="w"
+            ).grid(row=row, column=4, padx=10, pady=5, sticky="w")
 
             row += 1
 

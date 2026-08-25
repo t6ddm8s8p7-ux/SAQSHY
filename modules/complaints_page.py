@@ -8,6 +8,7 @@ import customtkinter as ctk
 from tkinter import filedialog, messagebox
 
 from modules.translations import get_language
+from modules.complaint_translations import translate_list, get_complaint_translation
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 DB_PATH = PROJECT_ROOT / "database" / "sanepi.db"
@@ -18,7 +19,7 @@ SOURCES = ["Гость (устно)", "Гость (книга жалоб)", "К�
 CATEGORIES = ["Питание /Restaurant", "Чистота / Номера", "Обслуживание", "Бассейн / Аквапарк",
               "СПА / Массаж", "Шум / Кондиционер", "Безопасность", "Детский клуб", "Прачечная",
               "Трансфер / Парковка", "Wi-Fi / Техника", "Другое"]
-STATUSES = ["🆕 Новая", "⚙️ В работе", "✅ Решена", "❌ Отклонена", "🔁 Повторная"]
+STATUSES = ["🆕 Новая", "⚙️ В работе", "✅ Решена", "❌ Отклонена", " Повторная"]
 PRIORITIES = ["🔴 Высокая", "🟡 Средняя", "🟢 Низкая"]
 
 COMPLAINT_TYPES = [
@@ -41,79 +42,82 @@ COMPLAINT_TYPES = [
 ]
 
 T = {
-    "title": {"ru": "📢 Журнал жалоб и обращений", "kk": "📢 Шағымдар журналы", "en": "📢 Complaints log"},
-    "add": {"ru": "➕ Новая жалоба", "kk": "➕ Жаңа шағым", "en": "➕ New"},
-    "export": {"ru": "📥 Excel", "kk": "📥 Excel", "en": "📥 Excel"},
-    "no_rec": {"ru": "Жалоб за период нет.", "kk": "Кезеңде шағымдар жоқ.", "en": "No complaints."},
-    "warning": {"ru": "⚠️ Внимание", "kk": "⚠️ Назар аударыңыз", "en": "⚠️ Warning"},
-    "del": {"ru": "Удалить жалобу?", "kk": "Шағымды жою?", "en": "Delete complaint?"},
-    "need_text": {"ru": "Опишите суть жалобы!", "kk": "Шағымның мәнін жазыңыз!", "en": "Describe the complaint!"},
-    "from": {"ru": "с", "kk": "бастап", "en": "from"},
-    "to": {"ru": "по", "kk": "дейін", "en": "to"},
-    "save": {"ru": "💾 Сохранить", "kk": "💾 Сақтау", "en": "💾 Save"},
-    "date": {"ru": "Дата поступления:", "kk": "Келіп түскен күні:", "en": "Received:"},
-    "source": {"ru": "Источник:", "kk": "Көзі:", "en": "Source:"},
-    "source_note": {"ru": "💬 Комментарий к источнику (ссылка, № комнаты, кто сообщил):",
-                    "kk": "💬 Дереккөзге түсініктеме (сілтеме, № бөлме, кім хабарлады):",
-                    "en": "💬 Source comment (link, room №, who reported):"},
-    "category": {"ru": "Категория:", "kk": "Санат:", "en": "Category:"},
-    "priority": {"ru": "Приоритет:", "kk": "Басымдық:", "en": "Priority:"},
-    "status": {"ru": "Статус:", "kk": "Мәртебе:", "en": "Status:"},
-    "guest": {"ru": "Гость / ФИО / № комнаты:", "kk": "Қонақ / АТЖ / № бөлме:", "en": "Guest / Room:"},
-    "department": {"ru": "Ответственный отдел:", "kk": "Жауапты бөлім:", "en": "Department:"},
-    "assignee": {"ru": "Исполнитель:", "kk": "Орындаушы:", "en": "Assignee:"},
-    "deadline": {"ru": "Срок решения:", "kk": "Шешу мерзімі:", "en": "Deadline:"},
-    "description": {"ru": "Суть жалобы (выберите или впишите):", "kk": "Шағымның мәні (таңдаңыз немесе жазыңыз):", "en": "Complaint (choose or type):"},
-    "measures": {"ru": "Принятые меры:", "kk": "Қабылданған шаралар:", "en": "Measures:"},
-    "result": {"ru": "Итог / ответ гостю:", "kk": "Нәтиже / қонаққа жауап:", "en": "Result:"},
+    "title": {"ru": "📢 Журнал жалоб", "kk": "📢 Шағымдар журналы", "en": "📢 Complaints log", "tr": "📢 Şikayet günlüğü"},
+    "add": {"ru": "➕ Новая", "kk": "➕ Жаңа", "en": "➕ New", "tr": "➕ Yeni"},
+    "export": {"ru": "📥 Excel", "kk": "📥 Excel", "en": " Excel", "tr": "📥 Excel"},
+    "no_rec": {"ru": "Жалоб за период нет.", "kk": "Кезеңде шағымдар жоқ.", "en": "No complaints.", "tr": "Bu dönemde şikayet yok."},
+    "warning": {"ru": "⚠️ Внимание", "kk": "⚠️ Назар аударыңыз", "en": "⚠️ Warning", "tr": "⚠️ Dikkat"},
+    "del": {"ru": "Удалить жалобу?", "kk": "Шағымды жою?", "en": "Delete complaint?", "tr": "Şikayet silinsin mi?"},
+    "need_text": {"ru": "Опишите суть жалобы!", "kk": "Шағымның мәнін жазыңыз!", "en": "Describe the complaint!", "tr": "Şikayeti açıklayın!"},
+    "from": {"ru": "с", "kk": "бастап", "en": "from", "tr": "başlangıç"},
+    "to": {"ru": "по", "kk": "дейін", "en": "to", "tr": "bitiş"},
+    "save": {"ru": "💾 Сохранить", "kk": "💾 Сақтау", "en": " Save", "tr": "💾 Kaydet"},
+    "date": {"ru": "Дата:", "kk": "Күні:", "en": "Date:", "tr": "Tarih:"},
+    "source": {"ru": "Источник:", "kk": "Көзі:", "en": "Source:", "tr": "Kaynak:"},
+    "source_note": {"ru": "💬 Комментарий (ссылка, № комнаты):", "kk": "💬 Түсініктеме (сілтеме, № бөлме):", "en": "💬 Comment (link, room №):", "tr": "💬 Yorum (link, oda no):"},
+    "category": {"ru": "Категория:", "kk": "Санат:", "en": "Category:", "tr": "Kategori:"},
+    "priority": {"ru": "Приоритет:", "kk": "Басымдық:", "en": "Priority:", "tr": "Öncelik:"},
+    "status": {"ru": "Статус:", "kk": "Мәртебе:", "en": "Status:", "tr": "Durum:"},
+    "guest": {"ru": "Гость / № комнаты:", "kk": "Қонақ / № бөлме:", "en": "Guest / Room:", "tr": "Misafir / Oda:"},
+    "department": {"ru": "Отдел:", "kk": "Бөлім:", "en": "Department:", "tr": "Departman:"},
+    "assignee": {"ru": "Исполнитель:", "kk": "Орындаушы:", "en": "Assignee:", "tr": "Sorumlu:"},
+    "deadline": {"ru": "Срок:", "kk": "Мерзімі:", "en": "Deadline:", "tr": "Son tarih:"},
+    "description": {"ru": "Суть жалобы:", "kk": "Шағымның мәні:", "en": "Complaint details:", "tr": "Şikayet detayı:"},
+    "measures": {"ru": "Принятые меры:", "kk": "Қабылданған шаралар:", "en": "Measures taken:", "tr": "Alınan önlemler:"},
+    "result": {"ru": "Итог / ответ:", "kk": "Нәтиже / жауап:", "en": "Result / reply:", "tr": "Sonuç / yanıt:"},
+    "all": {"ru": "Все", "kk": "Барлығы", "en": "All", "tr": "Tümü"},
+    "stat_total": {"ru": "Всего", "kk": "Барлығы", "en": "Total", "tr": "Toplam"},
+    "stat_new": {"ru": "🆕 Новых", "kk": "🆕 Жаңа", "en": "🆕 New", "tr": " Yeni"},
+    "stat_work": {"ru": "⚙️ В работе", "kk": "⚙️ Жұмыста", "en": "⚙️ In progress", "tr": "⚙️ Devam eden"},
+    "stat_done": {"ru": "✅ Решено", "kk": "✅ Шешілді", "en": "✅ Resolved", "tr": "✅ Çözüldü"},
+    "stat_high": {"ru": "🔴 Высокий приоритет", "kk": "🔴 Жоғары басымдық", "en": "🔴 High priority", "tr": "🔴 Yüksek öncelik"},
+    "excel_title": {"ru": "ЖУРНАЛ ЖАЛОБ И ОБРАЩЕНИЙ", "kk": "ШАҒЫМДАР ЖУРНАЛЫ", "en": "COMPLAINTS LOG", "tr": "ŞİKAYET GÜNLÜĞÜ"},
+    "excel_period": {"ru": "Период:", "kk": "Кезең:", "en": "Period:", "tr": "Dönem:"},
+    "excel_h_date": {"ru": "Дата", "kk": "Күні", "en": "Date", "tr": "Tarih"},
+    "excel_h_source": {"ru": "Источник", "kk": "Көзі", "en": "Source", "tr": "Kaynak"},
+    "excel_h_note": {"ru": "Комментарий", "kk": "Түсініктеме", "en": "Comment", "tr": "Yorum"},
+    "excel_h_cat": {"ru": "Категория", "kk": "Санат", "en": "Category", "tr": "Kategori"},
+    "excel_h_prio": {"ru": "Приоритет", "kk": "Басымдық", "en": "Priority", "tr": "Öncelik"},
+    "excel_h_status": {"ru": "Статус", "kk": "Мәртебе", "en": "Status", "tr": "Durum"},
+    "excel_h_guest": {"ru": "Гость/№", "kk": "Қонақ/№", "en": "Guest/№", "tr": "Misafir/No"},
+    "excel_h_dep": {"ru": "Отдел", "kk": "Бөлім", "en": "Dept", "tr": "Departman"},
+    "excel_h_asn": {"ru": "Исполнитель", "kk": "Орындаушы", "en": "Assignee", "tr": "Sorumlu"},
+    "excel_h_dl": {"ru": "Срок", "kk": "Мерзім", "en": "Deadline", "tr": "Son tarih"},
+    "excel_h_desc": {"ru": "Описание", "kk": "Сипаттама", "en": "Description", "tr": "Açıklama"},
+    "excel_h_meas": {"ru": "Меры", "kk": "Шаралар", "en": "Measures", "tr": "Önlemler"},
+    "excel_h_res": {"ru": "Итог", "kk": "Нәтиже", "en": "Result", "tr": "Sonuç"},
+    "excel_saved": {"ru": "Сохранено:", "kk": "Сақталды:", "en": "Saved:", "tr": "Kaydedildi:"},
+    "excel_error": {"ru": "Ошибка", "kk": "Қате", "en": "Error", "tr": "Hata"},
+    "excel_install": {"ru": "Установите: pip install openpyxl", "kk": "Орнатыңыз: pip install openpyxl", "en": "Install: pip install openpyxl", "tr": "Yükleyin: pip install openpyxl"},
 }
-
 
 def tt(key):
     d = T.get(key)
     return d.get(get_language(), d.get("ru", key)) if d else key
 
-
 def db():
     return sqlite3.connect(DB_PATH)
-
 
 def ensure_table():
     c = db()
     c.execute("""CREATE TABLE IF NOT EXISTS complaints (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        date TEXT,
-        source TEXT,
-        source_note TEXT DEFAULT '',
-        category TEXT,
-        priority TEXT,
-        status TEXT,
-        guest TEXT,
-        department TEXT,
-        assignee TEXT,
-        deadline TEXT,
-        description TEXT,
-        measures TEXT,
-        result TEXT,
+        id INTEGER PRIMARY KEY AUTOINCREMENT, date TEXT, source TEXT, source_note TEXT DEFAULT '',
+        category TEXT, priority TEXT, status TEXT, guest TEXT, department TEXT, assignee TEXT,
+        deadline TEXT, description TEXT, measures TEXT, result TEXT,
         created_at TEXT DEFAULT (datetime('now','localtime'))
     )""")
-    try:  # миграция старой базы
+    try:
         c.execute("ALTER TABLE complaints ADD COLUMN source_note TEXT DEFAULT ''")
     except sqlite3.OperationalError:
         pass
     c.commit()
     c.close()
 
-
 def month_bounds():
     t = date.today()
     f = t.replace(day=1).isoformat()
-    if t.month == 12:
-        to = t.replace(year=t.year + 1, month=1, day=1) - timedelta(days=1)
-    else:
-        to = t.replace(month=t.month + 1, day=1) - timedelta(days=1)
+    to = t.replace(month=t.month + 1, day=1) - timedelta(days=1) if t.month != 12 else t.replace(year=t.year + 1, month=1, day=1) - timedelta(days=1)
     return f, to.isoformat()
-
 
 def build_complaints_page(master):
     ComplaintsPage(master).pack(fill="both", expand=True)
@@ -127,8 +131,8 @@ class ComplaintsPage(ctk.CTkFrame):
         f, t = month_bounds()
         self.from_var = ctk.StringVar(value=f)
         self.to_var = ctk.StringVar(value=t)
-        self.filter_cat = ctk.StringVar(value="Все")
-        self.filter_st = ctk.StringVar(value="Все")
+        self.filter_cat = ctk.StringVar(value=tt("all"))
+        self.filter_st = ctk.StringVar(value=tt("all"))
         self.rebuild()
 
     def rebuild(self):
@@ -146,17 +150,17 @@ class ComplaintsPage(ctk.CTkFrame):
         stats = self._stats()
         sf = ctk.CTkFrame(self, fg_color="transparent")
         sf.pack(fill="x", padx=10, pady=5)
-        for color, label, val in [
-            ("#1e40af", "Всего", stats["total"]),
-            ("#dc2626", "🆕 Новых", stats["new"]),
-            ("#ca8a04", "⚙️ В работе", stats["work"]),
-            ("#16a34a", "✅ Решено", stats["done"]),
-            ("#7c3aed", "🔴 Высокий приоритет", stats["high"]),
+        for color, label_key, val in [
+            ("#1e40af", "stat_total", stats["total"]),
+            ("#dc2626", "stat_new", stats["new"]),
+            ("#ca8a04", "stat_work", stats["work"]),
+            ("#16a34a", "stat_done", stats["done"]),
+            ("#7c3aed", "stat_high", stats["high"]),
         ]:
             card = ctk.CTkFrame(sf, fg_color=color, corner_radius=10)
             card.pack(side="left", fill="x", expand=True, padx=3)
             ctk.CTkLabel(card, text=str(val), font=ctk.CTkFont(size=22, weight="bold")).pack(padx=10, pady=(6, 0))
-            ctk.CTkLabel(card, text=label, font=ctk.CTkFont(size=11)).pack(padx=10, pady=(0, 6))
+            ctk.CTkLabel(card, text=tt(label_key), font=ctk.CTkFont(size=11)).pack(padx=10, pady=(0, 6))
 
         pf = ctk.CTkFrame(self)
         pf.pack(fill="x", padx=10, pady=5)
@@ -164,8 +168,8 @@ class ComplaintsPage(ctk.CTkFrame):
         ctk.CTkEntry(pf, textvariable=self.from_var, width=110).pack(side="left")
         ctk.CTkLabel(pf, text=tt("to")).pack(side="left", padx=(10, 4))
         ctk.CTkEntry(pf, textvariable=self.to_var, width=110).pack(side="left")
-        ctk.CTkOptionMenu(pf, values=["Все"] + CATEGORIES, variable=self.filter_cat, width=180).pack(side="left", padx=10)
-        ctk.CTkOptionMenu(pf, values=["Все"] + STATUSES, variable=self.filter_st, width=140).pack(side="left")
+        ctk.CTkOptionMenu(pf, values=[tt("all")] + CATEGORIES, variable=self.filter_cat, width=180).pack(side="left", padx=10)
+        ctk.CTkOptionMenu(pf, values=[tt("all")] + STATUSES, variable=self.filter_st, width=140).pack(side="left")
         ctk.CTkButton(pf, text="🔎", width=40, fg_color="gray25", command=self.rebuild).pack(side="left", padx=10)
 
         card = ctk.CTkFrame(self)
@@ -178,27 +182,35 @@ class ComplaintsPage(ctk.CTkFrame):
             ctk.CTkLabel(box, text=tt("no_rec"), text_color="gray").pack(pady=10)
             return
 
+        lang = get_language()
+
         for r in rows:
             rid, d, src, srcnote, cat, prio, st, guest, dep, asn, dl, desc, meas, res = r
             row = ctk.CTkFrame(box, fg_color="gray15")
             row.pack(fill="x", pady=3)
+
+            # Переводим отображаемые значения
+            cat_display = get_complaint_translation(cat, lang)
+            prio_display = get_complaint_translation(prio, lang)
+            st_display = get_complaint_translation(st, lang)
+            src_display = get_complaint_translation(src, lang)
 
             prio_col = {"🔴 Высокая": "#dc2626", "🟡 Средняя": "#ca8a04"}.get(prio, "#16a34a")
             st_col = {"🆕 Новая": "#dc2626", "⚙️ В работе": "#ca8a04", "✅ Решена": "#16a34a"}.get(st, "#6b7280")
 
             top = ctk.CTkFrame(row, fg_color="transparent")
             top.pack(fill="x", padx=8, pady=(6, 0))
-            ctk.CTkLabel(top, text=f"{d} • {cat}", font=ctk.CTkFont(size=13, weight="bold"),
+            ctk.CTkLabel(top, text=f"{d} • {cat_display}", font=ctk.CTkFont(size=13, weight="bold"),
                          anchor="w").pack(side="left")
-            ctk.CTkLabel(top, text=prio, text_color=prio_col,
+            ctk.CTkLabel(top, text=prio_display, text_color=prio_col,
                          font=ctk.CTkFont(size=12, weight="bold")).pack(side="right", padx=(4, 0))
-            ctk.CTkLabel(top, text=st, text_color=st_col,
+            ctk.CTkLabel(top, text=st_display, text_color=st_col,
                          font=ctk.CTkFont(size=12, weight="bold")).pack(side="right")
 
-            src_txt = f"📥 {src}" + (f" • 💬 {srcnote}" if srcnote else "") + (f" • 👤 {guest}" if guest else "")
+            src_txt = f"📥 {src_display}" + (f" • 💬 {srcnote}" if srcnote else "") + (f" •  {guest}" if guest else "")
             ctk.CTkLabel(row, text=src_txt, text_color="gray", anchor="w",
                          justify="left", wraplength=880).pack(anchor="w", padx=8)
-            ctk.CTkLabel(row, text=f"🏢 {dep}" + (f" • 🔧 {asn}" if asn else "") + (f" • ⏰ до {dl}" if dl else ""),
+            ctk.CTkLabel(row, text=f"🏢 {dep}" + (f" • 🔧 {asn}" if asn else "") + (f" • ⏰ {tt('to')} {dl}" if dl else ""),
                          text_color="#7fb6c9", anchor="w").pack(anchor="w", padx=8)
             ctk.CTkLabel(row, text=desc, anchor="w", justify="left", wraplength=880).pack(anchor="w", padx=8)
             if meas:
@@ -208,7 +220,7 @@ class ComplaintsPage(ctk.CTkFrame):
                 ctk.CTkLabel(row, text=f"✅ {res}", text_color="#93c5fd", anchor="w",
                              justify="left", wraplength=880).pack(anchor="w", padx=8, pady=(0, 6))
 
-            ctk.CTkButton(row, text="🗑️", width=36, fg_color="#7f1d1d", hover_color="#991b1b",
+            ctk.CTkButton(row, text="️", width=36, fg_color="#7f1d1d", hover_color="#991b1b",
                           command=lambda i=rid: self.delete(i)).pack(side="right", padx=6, pady=6)
             ctk.CTkButton(row, text="✏️", width=36, fg_color="gray25",
                           command=lambda rec=r: self.dialog(rec)).pack(side="right", pady=6)
@@ -216,10 +228,10 @@ class ComplaintsPage(ctk.CTkFrame):
     def _where(self):
         conds = ["date BETWEEN ? AND ?"]
         args = [self.from_var.get(), self.to_var.get()]
-        if self.filter_cat.get() != "Все":
+        if self.filter_cat.get() != tt("all"):
             conds.append("category = ?")
             args.append(self.filter_cat.get())
-        if self.filter_st.get() != "Все":
+        if self.filter_st.get() != tt("all"):
             conds.append("status = ?")
             args.append(self.filter_st.get())
         return " AND ".join(conds), args
@@ -251,6 +263,35 @@ class ComplaintsPage(ctk.CTkFrame):
         win.title(tt("title"))
         win.geometry("560x780")
         win.grab_set()
+
+        lang = get_language()
+
+        # Переведенные списки
+        tr_sources = translate_list(SOURCES, lang)
+        tr_categories = translate_list(CATEGORIES, lang)
+        tr_priorities = translate_list(PRIORITIES, lang)
+        tr_statuses = translate_list(STATUSES, lang)
+        tr_types = translate_list(COMPLAINT_TYPES, lang)
+
+        # Обратный маппинг: переведенное -> оригинал
+        reverse_map = {}
+        for orig_list, tr_list in [
+            (SOURCES, tr_sources),
+            (CATEGORIES, tr_categories),
+            (PRIORITIES, tr_priorities),
+            (STATUSES, tr_statuses),
+            (COMPLAINT_TYPES, tr_types),
+        ]:
+            for orig, tr in zip(orig_list, tr_list):
+                reverse_map[tr] = orig
+
+        def find_translated(orig_value, orig_list, tr_list):
+            try:
+                idx = orig_list.index(orig_value)
+                return tr_list[idx]
+            except (ValueError, IndexError):
+                return tr_list[0] if tr_list else ""
+
         g = rec or ("", date.today().isoformat(), SOURCES[0], "", CATEGORIES[0], PRIORITIES[1], STATUSES[0],
                     "", "", "", "", "", "", "")
 
@@ -261,20 +302,28 @@ class ComplaintsPage(ctk.CTkFrame):
         e_date = ctk.CTkEntry(scroll); e_date.insert(0, g[1]); e_date.pack(fill="x")
 
         ctk.CTkLabel(scroll, text=tt("source")).pack(anchor="w", pady=(8, 0))
-        m_src = ctk.CTkOptionMenu(scroll, values=SOURCES); m_src.set(g[2]); m_src.pack(fill="x")
+        m_src = ctk.CTkOptionMenu(scroll, values=tr_sources)
+        m_src.set(find_translated(g[2], SOURCES, tr_sources))
+        m_src.pack(fill="x")
 
         ctk.CTkLabel(scroll, text=tt("source_note")).pack(anchor="w", pady=(8, 0))
         e_srcnote = ctk.CTkEntry(scroll, placeholder_text="напр.: ссылка на отзыв, № комнаты, ФИО сообщившего")
         e_srcnote.insert(0, g[3]); e_srcnote.pack(fill="x")
 
         ctk.CTkLabel(scroll, text=tt("category")).pack(anchor="w", pady=(8, 0))
-        m_cat = ctk.CTkOptionMenu(scroll, values=CATEGORIES); m_cat.set(g[4]); m_cat.pack(fill="x")
+        m_cat = ctk.CTkOptionMenu(scroll, values=tr_categories)
+        m_cat.set(find_translated(g[4], CATEGORIES, tr_categories))
+        m_cat.pack(fill="x")
 
         r3 = ctk.CTkFrame(scroll, fg_color="transparent"); r3.pack(fill="x", pady=(8, 0))
         ctk.CTkLabel(r3, text=tt("priority")).pack(side="left", padx=(0, 6))
-        m_prio = ctk.CTkOptionMenu(r3, values=PRIORITIES, width=140); m_prio.set(g[5]); m_prio.pack(side="left")
+        m_prio = ctk.CTkOptionMenu(r3, values=tr_priorities, width=140)
+        m_prio.set(find_translated(g[5], PRIORITIES, tr_priorities))
+        m_prio.pack(side="left")
         ctk.CTkLabel(r3, text=tt("status")).pack(side="left", padx=(16, 6))
-        m_st = ctk.CTkOptionMenu(r3, values=STATUSES, width=140); m_st.set(g[6]); m_st.pack(side="left")
+        m_st = ctk.CTkOptionMenu(r3, values=tr_statuses, width=140)
+        m_st.set(find_translated(g[6], STATUSES, tr_statuses))
+        m_st.pack(side="left")
 
         ctk.CTkLabel(scroll, text=tt("guest")).pack(anchor="w", pady=(8, 0))
         e_guest = ctk.CTkEntry(scroll); e_guest.insert(0, g[7]); e_guest.pack(fill="x")
@@ -289,8 +338,8 @@ class ComplaintsPage(ctk.CTkFrame):
         e_dl = ctk.CTkEntry(scroll); e_dl.insert(0, g[10]); e_dl.pack(fill="x")
 
         ctk.CTkLabel(scroll, text=tt("description")).pack(anchor="w", pady=(8, 0))
-        c_desc = ctk.CTkComboBox(scroll, values=COMPLAINT_TYPES)
-        c_desc.set(g[11] if g[11] else "")
+        c_desc = ctk.CTkComboBox(scroll, values=tr_types)
+        c_desc.set(find_translated(g[11], COMPLAINT_TYPES, tr_types) if g[11] else "")
         c_desc.pack(fill="x")
 
         ctk.CTkLabel(scroll, text=tt("measures")).pack(anchor="w", pady=(8, 0))
@@ -302,12 +351,23 @@ class ComplaintsPage(ctk.CTkFrame):
         t_res.insert("1.0", g[13])
 
         def save():
-            desc = c_desc.get().strip()
-            if not desc:
+            desc_trans = c_desc.get().strip()
+            desc_orig = reverse_map.get(desc_trans, desc_trans)
+            if not desc_orig:
                 messagebox.showwarning(tt("warning"), tt("need_text")); return
-            vals = (e_date.get(), m_src.get(), e_srcnote.get().strip(), m_cat.get(), m_prio.get(), m_st.get(),
-                    e_guest.get(), e_dep.get(), e_asn.get(), e_dl.get(), desc,
-                    t_meas.get("1.0", "end").strip(), t_res.get("1.0", "end").strip())
+
+            vals = (
+                e_date.get(),
+                reverse_map.get(m_src.get(), m_src.get()),
+                e_srcnote.get().strip(),
+                reverse_map.get(m_cat.get(), m_cat.get()),
+                reverse_map.get(m_prio.get(), m_prio.get()),
+                reverse_map.get(m_st.get(), m_st.get()),
+                e_guest.get(), e_dep.get(), e_asn.get(), e_dl.get(),
+                desc_orig,
+                t_meas.get("1.0", "end").strip(),
+                t_res.get("1.0", "end").strip()
+            )
             c = db()
             if rec:
                 c.execute("UPDATE complaints SET date=?, source=?, source_note=?, category=?, priority=?, status=?, "
@@ -336,32 +396,41 @@ class ComplaintsPage(ctk.CTkFrame):
             from openpyxl import Workbook
             from openpyxl.styles import Alignment, Border, Font, Side, PatternFill
         except ImportError:
-            messagebox.showerror("Ошибка", "pip install openpyxl"); return
+            messagebox.showerror(tt("excel_error"), tt("excel_install")); return
 
-        wb = Workbook(); ws = wb.active; ws.title = "Жалобы"
+        wb = Workbook(); ws = wb.active; ws.title = tt("title")
         wrap = Alignment(wrap_text=True, vertical="top")
         thin = Border(*[Side(style="thin")] * 4)
         bold = Font(bold=True)
         yellow = PatternFill("solid", fgColor="FEC50C")
 
         ws.merge_cells("A1:M1")
-        ws["A1"] = "ЖУРНАЛ ЖАЛОБ И ОБРАЩЕНИЙ"
+        ws["A1"] = tt("excel_title")
         ws["A1"].font = Font(bold=True, size=14)
         ws["A1"].fill = yellow
-        ws["A2"] = f"Период: {self.from_var.get()} — {self.to_var.get()}"
+        ws["A2"] = f"{tt('excel_period')} {self.from_var.get()} — {self.to_var.get()}"
 
-        headers = ["Дата", "Источник", "💬 Комментарий источника", "Категория", "Приоритет", "Статус",
-                   "Гость/№ комнаты", "Отдел", "Исполнитель", "Срок", "Описание", "Меры", "Итог"]
+        headers = [tt("excel_h_date"), tt("excel_h_source"), tt("excel_h_note"), tt("excel_h_cat"),
+                   tt("excel_h_prio"), tt("excel_h_status"), tt("excel_h_guest"), tt("excel_h_dep"),
+                   tt("excel_h_asn"), tt("excel_h_dl"), tt("excel_h_desc"), tt("excel_h_meas"), tt("excel_h_res")]
         for j, h in enumerate(headers, start=1):
             cell = ws.cell(row=4, column=j, value=h); cell.font = bold; cell.border = thin
 
         prio_fill = {"🔴 Высокая": "FCA5A5", "🟡 Средняя": "FDE68A", "🟢 Низкая": "BBF7D0"}
         st_fill = {"🆕 Новая": "FCA5A5", "⚙️ В работе": "FDE68A", "✅ Решена": "BBF7D0", "❌ Отклонена": "D1D5DB"}
 
+        lang = get_language()
         for i, r in enumerate(rows, start=5):
-            vals = r[1:14]
+            vals = list(r[1:14])
+            # Переводим значения для Excel
+            vals[1] = get_complaint_translation(vals[1], lang)  # source
+            vals[3] = get_complaint_translation(vals[3], lang)  # category
+            vals[4] = get_complaint_translation(vals[4], lang)  # priority
+            vals[5] = get_complaint_translation(vals[5], lang)  # status
+
             for j, v in enumerate(vals, start=1):
                 cell = ws.cell(row=i, column=j, value=v); cell.alignment = wrap; cell.border = thin
+
             p = vals[4]
             if p in prio_fill:
                 ws.cell(row=i, column=5).fill = PatternFill("solid", fgColor=prio_fill[p])
@@ -372,4 +441,4 @@ class ComplaintsPage(ctk.CTkFrame):
         for j, w in enumerate([12, 24, 32, 22, 14, 14, 22, 20, 20, 12, 40, 30, 30], start=1):
             ws.column_dimensions[chr(64 + j)].width = w
         wb.save(path)
-        messagebox.showinfo("✅", f"Сохранено:\n{path}")
+        messagebox.showinfo("✅", f"{tt('excel_saved')}\n{path}")

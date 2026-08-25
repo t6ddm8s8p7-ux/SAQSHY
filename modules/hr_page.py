@@ -89,7 +89,7 @@ def build_hr_page(parent):
     stats_frame.pack(padx=20, pady=10, fill="x")
 
     make_stat_card(stats_frame, f"👥 {tr('total_hr')}", total_hr, "#60a5fa")
-    make_stat_card(stats_frame, f"🟢 {exists_text}", exists_count, "#22c55e")
+    make_stat_card(stats_frame, f" {exists_text}", exists_count, "#22c55e")
     make_stat_card(stats_frame, f"🔴 {not_exists_text}", only_hr_count, "#ef4444")
     make_stat_card(stats_frame, f"🏢 {tr('departments')}", len(departments), "#a78bfa")
 
@@ -151,8 +151,20 @@ def build_hr_page(parent):
         height=38
     ).grid(row=0, column=2, padx=15, pady=15)
 
-    table = ctk.CTkScrollableFrame(parent, corner_radius=14)
-    table.pack(padx=20, pady=10, fill="both", expand=True)
+    # ДОБАВЛЕНА ГОРИЗОНТАЛЬНАЯ ПРОКРУТКА ДЛЯ ТАБЛИЦЫ
+    table_scroll = ctk.CTkScrollableFrame(
+        parent, 
+        corner_radius=14, 
+        orientation="horizontal",  # Горизонтальная прокрутка
+        scrollbar_button_color="#0d3d4b",
+        scrollbar_button_hover_color="#155e75",
+    )
+    table_scroll.pack(padx=20, pady=10, fill="both", expand=True)
+
+    # Внутренний контейнер для таблицы (фиксированная минимальная ширина)
+    table = ctk.CTkFrame(table_scroll, fg_color="transparent")
+    table.pack(fill="both", expand=True)
+    table.configure(width=1200)  # Минимальная ширина таблицы
 
     def clear_table():
         for widget in table.winfo_children():
@@ -168,11 +180,16 @@ def build_hr_page(parent):
             tr("esen_status")
         ]
 
-        for col, header in enumerate(headers):
+        # Увеличенные ширины колонок
+        col_widths = [300, 250, 350, 200]
+
+        for col, (header, width) in enumerate(zip(headers, col_widths)):
             ctk.CTkLabel(
                 table,
                 text=header,
-                font=("Arial", 15, "bold")
+                font=("Arial", 15, "bold"),
+                width=width,
+                anchor="w"
             ).grid(row=0, column=col, padx=12, pady=8, sticky="w")
 
         query = search_var.get().strip().lower()
@@ -188,7 +205,7 @@ def build_hr_page(parent):
 
             status_key = "not_in_esen" if name.lower() in only_hr_names else "exists_in_esen"
             status_plain = tr(status_key)
-            status_text = f"🔴 {tr('not_in_esen')}" if status_key == "not_in_esen" else f"🟢 {tr('exists_in_esen')}"
+            status_text = f"🔴 {tr('not_in_esen')}" if status_key == "not_in_esen" else f" {tr('exists_in_esen')}"
 
             if query:
                 searchable = f"{name} {position} {dep} {translate_department(dep)}".lower()
@@ -208,12 +225,12 @@ def build_hr_page(parent):
                 status_text
             ]
 
-            for col, value in enumerate(values):
+            for col, (value, width) in enumerate(zip(values, col_widths)):
                 if col == 0:
                     ctk.CTkButton(
                         table,
                         text=value,
-                        width=270,
+                        width=width,
                         anchor="w",
                         command=lambda e=emp: show_employee_card(e)
                     ).grid(row=row_index, column=col, padx=12, pady=5, sticky="w")
@@ -222,6 +239,8 @@ def build_hr_page(parent):
                         table,
                         text=str(value),
                         font=("Arial", 14),
+                        width=width,
+                        anchor="w",
                         text_color="#ef4444" if status_key == "not_in_esen" and col == 3 else None
                     ).grid(row=row_index, column=col, padx=12, pady=5, sticky="w")
 
