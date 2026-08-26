@@ -37,7 +37,6 @@ def _load_setting(key, default=None):
         return default
 
 
-# ВАЖНО: добавлен аргумент main_window
 def build_settings_page(parent, main_window):
     lang = get_language()
     
@@ -47,11 +46,102 @@ def build_settings_page(parent, main_window):
     # Заголовок
     ctk.CTkLabel(
         parent,
-        text="⚙️ " + tr('settings'),
+        text="️ " + tr('settings'),
         font=("Arial", 34, "bold")
     ).pack(pady=(20, 10))
     
-    # ========== РАЗДЕЛ 1: ИНТЕРФЕЙС ==========
+    # ========== РАЗДЕЛ 1: НАСТРОЙКИ E-SEN ==========
+    esen_frame = ctk.CTkFrame(parent, corner_radius=14)
+    esen_frame.pack(fill="x", padx=20, pady=10)
+    
+    ctk.CTkLabel(
+        esen_frame,
+        text=" e-SEN баптаулары / Настройки e-SEN",
+        font=("Arial", 18, "bold"),
+        text_color="#fec50c"
+    ).pack(anchor="w", padx=20, pady=(15, 10))
+    
+    # БИН (логин)
+    bin_frame = ctk.CTkFrame(esen_frame, fg_color="transparent")
+    bin_frame.pack(fill="x", padx=20, pady=8)
+    
+    ctk.CTkLabel(
+        bin_frame,
+        text=" БИН / Логин e-SEN:",
+        font=("Arial", 14),
+        anchor="w"
+    ).pack(fill="x", padx=10, pady=5)
+    
+    bin_entry = ctk.CTkEntry(
+        bin_frame,
+        placeholder_text="Введите БИН объекта",
+        width=400,
+        height=38
+    )
+    bin_entry.insert(0, _load_setting("esen_login", ""))
+    bin_entry.pack(fill="x", padx=10, pady=5)
+    
+    # Пароль
+    pass_frame = ctk.CTkFrame(esen_frame, fg_color="transparent")
+    pass_frame.pack(fill="x", padx=20, pady=8)
+    
+    ctk.CTkLabel(
+        pass_frame,
+        text="🔒 Пароль e-SEN:",
+        font=("Arial", 14),
+        anchor="w"
+    ).pack(fill="x", padx=10, pady=5)
+    
+    pass_entry = ctk.CTkEntry(
+        pass_frame,
+        placeholder_text="Введите пароль",
+        show="*",
+        width=400,
+        height=38
+    )
+    pass_entry.insert(0, _load_setting("esen_password", ""))
+    pass_entry.pack(fill="x", padx=10, pady=5)
+    
+    # Ссылка
+    url_frame = ctk.CTkFrame(esen_frame, fg_color="transparent")
+    url_frame.pack(fill="x", padx=20, pady=8)
+    
+    ctk.CTkLabel(
+        url_frame,
+        text="🌐 Ссылка e-SEN:",
+        font=("Arial", 14),
+        anchor="w"
+    ).pack(fill="x", padx=10, pady=5)
+    
+    url_entry = ctk.CTkEntry(
+        url_frame,
+        placeholder_text="https://e-sen.kz",
+        width=400,
+        height=38
+    )
+    url_entry.insert(0, _load_setting("esen_url", "https://e-sen.kz"))
+    url_entry.pack(fill="x", padx=10, pady=5)
+    
+    def save_esen_settings():
+        _save_setting("esen_login", bin_entry.get())
+        _save_setting("esen_password", pass_entry.get())
+        _save_setting("esen_url", url_entry.get())
+        messagebox.showinfo("SanEpi AI", "✅ Настройки e-SEN сохранены!")
+    
+    ctk.CTkButton(
+        esen_frame,
+        text="💾 Сақтау / Сохранить",
+        width=300,
+        height=42,
+        fg_color="#16a34a",
+        hover_color="#15803d",
+        font=("Arial", 14, "bold"),
+        command=save_esen_settings
+    ).pack(pady=10)
+    
+    print("✅ Раздел e-SEN создан")
+    
+    # ========== РАЗДЕЛ 2: ИНТЕРФЕЙС ==========
     interface_frame = ctk.CTkFrame(parent, corner_radius=14)
     interface_frame.pack(fill="x", padx=20, pady=10)
     
@@ -62,7 +152,7 @@ def build_settings_page(parent, main_window):
         text_color="#fec50c"
     ).pack(anchor="w", padx=20, pady=(15, 10))
     
-    # --- ЯЗЫК ---
+    # Язык
     lang_frame = ctk.CTkFrame(interface_frame, fg_color="transparent")
     lang_frame.pack(fill="x", padx=20, pady=10)
     
@@ -87,12 +177,9 @@ def build_settings_page(parent, main_window):
     
     def save_language():
         selected = lang_menu.get()
-        print(f"Выбран язык: {selected}")
         for code, name in LANGUAGES.items():
             if name == selected:
                 set_language(code)
-                
-                # ТЕПЕРЬ ЭТО РАБОТАЕТ НА 100%, так как main_window передан напрямую
                 main_window.sidebar.destroy()
                 main_window.resize_grip.destroy()
                 main_window.content.destroy()
@@ -101,7 +188,6 @@ def build_settings_page(parent, main_window):
                 main_window._build_ui()
                 main_window._set_active("settings")
                 main_window.open_settings()
-                
                 messagebox.showinfo("SanEpi AI", f"Язык изменён: {name}")
                 break
     
@@ -114,187 +200,6 @@ def build_settings_page(parent, main_window):
         hover_color="#15803d",
         font=("Arial", 14, "bold"),
         command=save_language
-    ).pack(pady=10)
-    
-    print("✅ Кнопка языка создана")
-    
-    # --- РАЗМЕР ШРИФТА ---
-    font_frame = ctk.CTkFrame(interface_frame, fg_color="transparent")
-    font_frame.pack(fill="x", padx=20, pady=10)
-    
-    ctk.CTkLabel(
-        font_frame,
-        text="🔤 Қаріп өлшемі / Размер шрифта:",
-        font=("Arial", 14),
-        anchor="w"
-    ).pack(fill="x", padx=10, pady=5)
-    
-    saved_font_size = _load_setting("font_size", 14)
-    font_size_var = ctk.StringVar(value=str(saved_font_size))
-    
-    font_slider = ctk.CTkSlider(
-        font_frame,
-        from_=12,
-        to=20,
-        number_of_steps=8,
-        command=lambda v: font_size_var.set(str(int(v)))
-    )
-    font_slider.set(int(saved_font_size))
-    font_slider.pack(fill="x", padx=10, pady=5)
-    
-    ctk.CTkLabel(
-        font_frame,
-        textvariable=font_size_var,
-        font=("Arial", 16, "bold"),
-    ).pack(pady=5)
-    
-    def save_font_size():
-        size = int(font_size_var.get())
-        _save_setting("font_size", size)
-        messagebox.showinfo("SanEpi AI", f"Размер шрифта: {size}")
-    
-    ctk.CTkButton(
-        font_frame,
-        text="💾 Сақтау / Сохранить",
-        width=300,
-        height=40,
-        fg_color="#16a34a",
-        hover_color="#15803d",
-        command=save_font_size
-    ).pack(pady=10)
-    
-    print("✅ Кнопка шрифта создана")
-    
-    # --- ТЕМА ---
-    theme_frame = ctk.CTkFrame(interface_frame, fg_color="transparent")
-    theme_frame.pack(fill="x", padx=20, pady=10)
-    
-    ctk.CTkLabel(
-        theme_frame,
-        text="🎨 Тақырып / Тема:",
-        font=("Arial", 14),
-        anchor="w"
-    ).pack(fill="x", padx=10, pady=5)
-    
-    saved_theme = _load_setting("theme", "Dark")
-    theme_names = {"Dark": "Қараңғы / Тёмная", "Light": "Жарық / Светлая", "System": "Жүйе / Системная"}
-    
-    theme_menu = ctk.CTkOptionMenu(
-        theme_frame,
-        values=["Қараңғы / Тёмная", "Жарық / Светлая", "Жүйе / Системная"],
-        width=300,
-        height=38
-    )
-    theme_menu.set(theme_names.get(saved_theme, "Қараңғы / Тёмная"))
-    theme_menu.pack(fill="x", padx=10, pady=5)
-    
-    def save_theme():
-        theme = theme_menu.get()
-        theme_map = {
-            "Қараңғы / Тёмная": "Dark",
-            "Жарық / Светлая": "Light",
-            "Жүйе / Системная": "System"
-        }
-        _save_setting("theme", theme_map.get(theme, "Dark"))
-        ctk.set_appearance_mode(theme_map.get(theme, "Dark").lower())
-        messagebox.showinfo("SanEpi AI", f"Тема: {theme}")
-    
-    ctk.CTkButton(
-        theme_frame,
-        text="💾 Сақтау / Сохранить",
-        width=300,
-        height=40,
-        fg_color="#16a34a",
-        hover_color="#15803d",
-        command=save_theme
-    ).pack(pady=10)
-    
-    print("✅ Кнопка темы создана")
-    
-    # ========== РАЗДЕЛ 2: БЕЗОПАСНОСТЬ ==========
-    security_frame = ctk.CTkFrame(parent, corner_radius=14)
-    security_frame.pack(fill="x", padx=20, pady=10)
-    
-    ctk.CTkLabel(
-        security_frame,
-        text="🔐 Қауіпсіздік / Безопасность",
-        font=("Arial", 18, "bold"),
-        text_color="#fec50c"
-    ).pack(anchor="w", padx=20, pady=(15, 10))
-    
-    ctk.CTkButton(
-        security_frame,
-        text="🔑 Құпия сөзді өзгерту / Изменить пароль",
-        width=350,
-        height=42,
-        fg_color="#7c3aed",
-        hover_color="#6d28d9",
-        command=lambda: messagebox.showinfo("SanEpi AI", "Функция в разработке")
-    ).pack(pady=10)
-    
-    lock_frame = ctk.CTkFrame(security_frame, fg_color="transparent")
-    lock_frame.pack(fill="x", padx=20, pady=10)
-    
-    ctk.CTkLabel(
-        lock_frame,
-        text="⏱️ Автоблоктау (мин):",
-        font=("Arial", 14),
-        anchor="w"
-    ).pack(fill="x", padx=10, pady=5)
-    
-    lock_var = ctk.StringVar(value=str(_load_setting("auto_lock", "0")))
-    lock_menu = ctk.CTkOptionMenu(
-        lock_frame,
-        variable=lock_var,
-        values=["0", "5", "10", "15", "30", "60"],
-        width=200,
-        height=36
-    )
-    lock_menu.pack(fill="x", padx=10, pady=5)
-    
-    def save_lock():
-        _save_setting("auto_lock", lock_var.get())
-        messagebox.showinfo("SanEpi AI", f"Автоблокировка: {lock_var.get()} мин")
-    
-    ctk.CTkButton(
-        lock_frame,
-        text="💾 Сақтау / Сохранить",
-        width=300,
-        height=40,
-        fg_color="#16a34a",
-        hover_color="#15803d",
-        command=save_lock
-    ).pack(pady=10)
-    
-    log_frame = ctk.CTkFrame(security_frame, fg_color="transparent")
-    log_frame.pack(fill="x", padx=20, pady=10)
-    
-    ctk.CTkLabel(
-        log_frame,
-        text="📋 Логтау / Логирование:",
-        font=("Arial", 14),
-        anchor="w"
-    ).pack(fill="x", padx=10, pady=5)
-    
-    log_var = ctk.BooleanVar(value=_load_setting("enable_logging", True))
-    ctk.CTkSwitch(
-        log_frame,
-        text="Қосулы / Включено",
-        variable=log_var
-    ).pack(pady=5)
-    
-    def save_log():
-        _save_setting("enable_logging", log_var.get())
-        messagebox.showinfo("SanEpi AI", f"Логирование: {'вкл' if log_var.get() else 'выкл'}")
-    
-    ctk.CTkButton(
-        log_frame,
-        text="💾 Сақтау / Сохранить",
-        width=300,
-        height=40,
-        fg_color="#16a34a",
-        hover_color="#15803d",
-        command=save_log
     ).pack(pady=10)
     
     print("=== КОНЕЦ build_settings_page ===")
