@@ -1,3 +1,4 @@
+import tkinter as tk
 import customtkinter as ctk
 
 from modules.dashboard_data import load_dashboard_data, get_department
@@ -89,7 +90,7 @@ def build_hr_page(parent):
     stats_frame.pack(padx=20, pady=10, fill="x")
 
     make_stat_card(stats_frame, f"👥 {tr('total_hr')}", total_hr, "#60a5fa")
-    make_stat_card(stats_frame, f" {exists_text}", exists_count, "#22c55e")
+    make_stat_card(stats_frame, f"🟢 {exists_text}", exists_count, "#22c55e")
     make_stat_card(stats_frame, f"🔴 {not_exists_text}", only_hr_count, "#ef4444")
     make_stat_card(stats_frame, f"🏢 {tr('departments')}", len(departments), "#a78bfa")
 
@@ -98,7 +99,7 @@ def build_hr_page(parent):
 
     ctk.CTkButton(
         action_frame,
-        text=f"📥 {tr('import_hr_excel')}",
+        text=f" {tr('import_hr_excel')}",
         width=240,
         height=40,
         command=import_hr_excel
@@ -151,23 +152,47 @@ def build_hr_page(parent):
         height=38
     ).grid(row=0, column=2, padx=15, pady=15)
 
-    # ДОБАВЛЕНА ГОРИЗОНТАЛЬНАЯ ПРОКРУТКА ДЛЯ ТАБЛИЦЫ
-    table_scroll = ctk.CTkScrollableFrame(
-        parent, 
-        corner_radius=14, 
-        orientation="horizontal",  # Горизонтальная прокрутка
-        scrollbar_button_color="#0d3d4b",
-        scrollbar_button_hover_color="#155e75",
-    )
-    table_scroll.pack(padx=20, pady=10, fill="both", expand=True)
+    # ✅ ГОРИЗОНТАЛЬНАЯ + ВЕРТИКАЛЬНАЯ прокрутка через Canvas
+    table_outer = ctk.CTkFrame(parent, corner_radius=14, fg_color="#07222b")
+    table_outer.pack(padx=20, pady=10, fill="both", expand=True)
 
-    # Внутренний контейнер для таблицы (фиксированная минимальная ширина)
-    table = ctk.CTkFrame(table_scroll, fg_color="transparent")
-    table.pack(fill="both", expand=True)
-    table.configure(width=1200)  # Минимальная ширина таблицы
+    # Создаем Canvas с двумя скроллбарами
+    canvas = tk.Canvas(
+        table_outer,
+        bg="#07222b",
+        highlightthickness=0,
+        scrollregion=(0, 0, 1500, 5000)
+    )
+    
+    # Вертикальный скроллбар
+    v_scrollbar = ctk.CTkScrollbar(
+        table_outer,
+        orientation="vertical",
+        command=canvas.yview,
+        button_color="#0d3d4b",
+        button_hover_color="#155e75"
+    )
+    v_scrollbar.pack(side="right", fill="y")
+    
+    # Горизонтальный скроллбар
+    h_scrollbar = ctk.CTkScrollbar(
+        table_outer,
+        orientation="horizontal",
+        command=canvas.xview,
+        button_color="#0d3d4b",
+        button_hover_color="#155e75"
+    )
+    h_scrollbar.pack(side="bottom", fill="x")
+    
+    canvas.configure(yscrollcommand=v_scrollbar.set, xscrollcommand=h_scrollbar.set)
+    canvas.pack(side="left", fill="both", expand=True)
+
+    # Внутренний фрейм для таблицы
+    table_inner = ctk.CTkFrame(canvas, fg_color="transparent")
+    canvas.create_window((0, 0), window=table_inner, anchor="nw")
 
     def clear_table():
-        for widget in table.winfo_children():
+        for widget in table_inner.winfo_children():
             widget.destroy()
 
     def render():
@@ -180,12 +205,11 @@ def build_hr_page(parent):
             tr("esen_status")
         ]
 
-        # Увеличенные ширины колонок
         col_widths = [300, 250, 350, 200]
 
         for col, (header, width) in enumerate(zip(headers, col_widths)):
             ctk.CTkLabel(
-                table,
+                table_inner,
                 text=header,
                 font=("Arial", 15, "bold"),
                 width=width,
@@ -205,7 +229,7 @@ def build_hr_page(parent):
 
             status_key = "not_in_esen" if name.lower() in only_hr_names else "exists_in_esen"
             status_plain = tr(status_key)
-            status_text = f"🔴 {tr('not_in_esen')}" if status_key == "not_in_esen" else f" {tr('exists_in_esen')}"
+            status_text = f"🔴 {tr('not_in_esen')}" if status_key == "not_in_esen" else f"🟢 {tr('exists_in_esen')}"
 
             if query:
                 searchable = f"{name} {position} {dep} {translate_department(dep)}".lower()
@@ -228,7 +252,7 @@ def build_hr_page(parent):
             for col, (value, width) in enumerate(zip(values, col_widths)):
                 if col == 0:
                     ctk.CTkButton(
-                        table,
+                        table_inner,
                         text=value,
                         width=width,
                         anchor="w",
@@ -236,7 +260,7 @@ def build_hr_page(parent):
                     ).grid(row=row_index, column=col, padx=12, pady=5, sticky="w")
                 else:
                     ctk.CTkLabel(
-                        table,
+                        table_inner,
                         text=str(value),
                         font=("Arial", 14),
                         width=width,
@@ -248,10 +272,19 @@ def build_hr_page(parent):
 
         if row_index == 1:
             ctk.CTkLabel(
-                table,
+                table_inner,
                 text=tr("nothing_found"),
                 font=("Arial", 16)
             ).grid(row=1, column=0, padx=12, pady=20, sticky="w")
+
+        # Обновляем область прокрутки после рендера
+        table_inner.update_idletasks()
+        canvas.configure(scrollregion=canvas.bbox("all"))
+
+    # Привязка колесика мыши для вертикальной прокрутки
+    def _on_mousewheel(event):
+        canvas.yview_scroll(int(-1*(event.delta/120)), "units")
+    canvas.bind_all("<MouseWheel>", _on_mousewheel)
 
     search_var.trace_add("write", lambda *args: render())
     dep_var.trace_add("write", lambda *args: render())

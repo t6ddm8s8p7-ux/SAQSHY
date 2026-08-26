@@ -1,3 +1,4 @@
+import tkinter as tk
 import customtkinter as ctk
 
 from modules.dashboard_data import load_dashboard_data, clear_dashboard_cache
@@ -6,21 +7,21 @@ from modules.translations import tr
 
 def make_stat_card(parent, title, value, color):
     card = ctk.CTkFrame(parent, corner_radius=14, height=100)
-    card.pack_propagate(False)  # Запрещаем сжатие
+    card.pack_propagate(False)
     
     ctk.CTkLabel(
         card, 
         text=title, 
-        font=("Arial", 11, "bold"),  # Уменьшили шрифт
+        font=("Arial", 11, "bold"),
         text_color=color,
-        wraplength=160,  # Разрешаем перенос текста
-        justify="center"  # Центрируем текст
+        wraplength=160,
+        justify="center"
     ).pack(pady=(10, 5), padx=10)
     
     ctk.CTkLabel(
         card, 
         text=str(value), 
-        font=("Arial", 28, "bold"),  # Увеличили цифру
+        font=("Arial", 28, "bold"),
     ).pack(pady=(0, 10))
 
     return card
@@ -63,7 +64,6 @@ def build_esen_page(parent):
         card.grid(row=0, column=i, padx=6, pady=8, sticky="nsew")
         stats_frame.grid_columnconfigure(i, weight=1)
     
-    # Добавляем минимальное количество колонок
     for i in range(len(cards)):
         stats_frame.grid_columnconfigure(i, weight=1, minsize=140)
 
@@ -77,7 +77,6 @@ def build_esen_page(parent):
 
     def refresh_esen():
         from modules import esen
-
         esen.open_esen_login()
         clear_dashboard_cache()
         rebuild_page()
@@ -92,7 +91,6 @@ def build_esen_page(parent):
             compare_employees.compare_employees()
         elif hasattr(compare_employees, "run"):
             compare_employees.run()
-
         clear_dashboard_cache()
         rebuild_page()
 
@@ -128,7 +126,7 @@ def build_esen_page(parent):
         box.configure(state="disabled")
 
     actions = [
-        (f" {tr('update_esen')}", refresh_esen),
+        (f"🔄 {tr('update_esen')}", refresh_esen),
         (f"⚖️ {tr('compare_with_hr')}", compare_with_hr),
         (f"🟡 {tr('not_in_hr')}", show_only_esen),
         (f"➕ {tr('add_employees')}", None),
@@ -139,7 +137,7 @@ def build_esen_page(parent):
         ctk.CTkButton(
             action_frame,
             text=text,
-            width=200,  # Уменьшили ширину
+            width=200,
             height=42,
             command=command
         ).grid(row=0, column=i, padx=8, pady=10)
@@ -160,20 +158,44 @@ def build_esen_page(parent):
     )
     search_entry.pack(fill="x", padx=20, pady=(5, 10))
 
-    # ДОБАВЛЕНА ГОРИЗОНТАЛЬНАЯ ПРОКРУТКА
-    table_scroll = ctk.CTkScrollableFrame(
-        parent, 
-        corner_radius=14, 
-        orientation="horizontal",
-        scrollbar_button_color="#0d3d4b",
-        scrollbar_button_hover_color="#155e75",
-    )
-    table_scroll.pack(fill="both", expand=True, padx=20, pady=15)
+    # ✅ ГОРИЗОНТАЛЬНАЯ + ВЕРТИКАЛЬНАЯ прокрутка через Canvas
+    table_outer = ctk.CTkFrame(parent, corner_radius=14, fg_color="#07222b")
+    table_outer.pack(fill="both", expand=True, padx=20, pady=15)
 
-    # Внутренний контейнер с фиксированной шириной
-    table = ctk.CTkFrame(table_scroll, fg_color="transparent")
-    table.pack(fill="both", expand=True)
-    table.configure(width=1300)  # Минимальная ширина таблицы
+    # Создаем Canvas с двумя скроллбарами
+    canvas = tk.Canvas(
+        table_outer,
+        bg="#07222b",
+        highlightthickness=0,
+        scrollregion=(0, 0, 1500, 5000)
+    )
+    
+    # Вертикальный скроллбар
+    v_scrollbar = ctk.CTkScrollbar(
+        table_outer,
+        orientation="vertical",
+        command=canvas.yview,
+        button_color="#0d3d4b",
+        button_hover_color="#155e75"
+    )
+    v_scrollbar.pack(side="right", fill="y")
+    
+    # Горизонтальный скроллбар
+    h_scrollbar = ctk.CTkScrollbar(
+        table_outer,
+        orientation="horizontal",
+        command=canvas.xview,
+        button_color="#0d3d4b",
+        button_hover_color="#155e75"
+    )
+    h_scrollbar.pack(side="bottom", fill="x")
+    
+    canvas.configure(yscrollcommand=v_scrollbar.set, xscrollcommand=h_scrollbar.set)
+    canvas.pack(side="left", fill="both", expand=True)
+
+    # Внутренний фрейм для таблицы
+    table_inner = ctk.CTkFrame(canvas, fg_color="transparent")
+    canvas.create_window((0, 0), window=table_inner, anchor="nw")
 
     headers = [
         tr("fio"),
@@ -183,11 +205,10 @@ def build_esen_page(parent):
         tr("status"),
     ]
     
-    # Фиксированные ширины колонок
     col_widths = [300, 250, 150, 200, 200]
 
     def clear_table():
-        for widget in table.winfo_children():
+        for widget in table_inner.winfo_children():
             widget.destroy()
 
     def render_table():
@@ -195,7 +216,7 @@ def build_esen_page(parent):
 
         for col, (header, width) in enumerate(zip(headers, col_widths)):
             ctk.CTkLabel(
-                table,
+                table_inner,
                 text=header,
                 font=("Arial", 15, "bold"),
                 width=width,
@@ -218,28 +239,28 @@ def build_esen_page(parent):
                 continue
 
             ctk.CTkButton(
-                table,
+                table_inner,
                 text=emp.get("fio", "-"),
                 width=col_widths[0],
                 anchor="w"
             ).grid(row=row, column=0, padx=10, pady=5, sticky="w")
 
             ctk.CTkLabel(
-                table,
+                table_inner,
                 text=emp.get("position", "-"),
                 width=col_widths[1],
                 anchor="w"
             ).grid(row=row, column=1, padx=10, pady=5, sticky="w")
 
             ctk.CTkLabel(
-                table,
+                table_inner,
                 text=emp.get("medical_book", "-"),
                 width=col_widths[2],
                 anchor="w"
             ).grid(row=row, column=2, padx=10, pady=5, sticky="w")
 
             ctk.CTkLabel(
-                table,
+                table_inner,
                 text=emp.get("valid_until", "-"),
                 width=col_widths[3],
                 anchor="w"
@@ -253,7 +274,7 @@ def build_esen_page(parent):
                 color = "#ef4444"
 
             ctk.CTkLabel(
-                table,
+                table_inner,
                 text=status,
                 text_color=color,
                 width=col_widths[4],
@@ -264,10 +285,19 @@ def build_esen_page(parent):
 
         if row == 1:
             ctk.CTkLabel(
-                table,
+                table_inner,
                 text=tr("nothing_found"),
                 font=("Arial", 16)
             ).grid(row=1, column=0, padx=12, pady=20, sticky="w")
+
+        # Обновляем область прокрутки после рендера
+        table_inner.update_idletasks()
+        canvas.configure(scrollregion=canvas.bbox("all"))
+
+    # Привязка колесика мыши для вертикальной прокрутки
+    def _on_mousewheel(event):
+        canvas.yview_scroll(int(-1*(event.delta/120)), "units")
+    canvas.bind_all("<MouseWheel>", _on_mousewheel)
 
     search_var.trace_add("write", lambda *args: render_table())
 

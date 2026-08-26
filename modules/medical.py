@@ -1,5 +1,6 @@
 import os
 import webbrowser
+import tkinter as tk
 from datetime import datetime, date
 from pathlib import Path
 from urllib.parse import quote
@@ -209,7 +210,7 @@ def open_whatsapp_window(emp):
 
 
 def export_only_esen_excel():
-    """🆕 Отдельный Excel по «лишним»: есть в e-SEN, но нет в HR."""
+    """ Отдельный Excel по «лишним»: есть в e-SEN, но нет в HR."""
     data = load_dashboard_data()
     only_esen = (data.get("compare", {}) or {}).get("only_esen", []) or []
     if not only_esen:
@@ -283,7 +284,7 @@ def send_expiring_letter():
 
 def build_medical_page(parent):
     data = load_dashboard_data()
-    esen = get_hr_matched_esen(data)  # только по списку HR
+    esen = get_hr_matched_esen(data)
 
     valid_count = 0
     expiring_count = 0
@@ -318,9 +319,9 @@ def build_medical_page(parent):
     stats_frame.pack(fill="x", padx=20, pady=10)
 
     cards = [
-        ("👥 Всего по HR", len(esen), "#60a5fa"),
-        (f"🟢 {tr('valid')}", valid_count, "#22c55e"),
-        (f"🟡 {tr('expiring')}", expiring_count, "#f59e0b"),
+        (" Всего по HR", len(esen), "#60a5fa"),
+        (f" {tr('valid')}", valid_count, "#22c55e"),
+        (f" {tr('expiring')}", expiring_count, "#f59e0b"),
         (f"🔴 {tr('expired')}", expired_count, "#ef4444"),
         (f"⚪ {tr('unknown')}", unknown_count, "#9ca3af"),
     ]
@@ -366,7 +367,6 @@ def build_medical_page(parent):
         command=send_expiring_letter,
     ).pack(side="right")
 
-    # 🆕 ВТОРАЯ СТРОКА: экспорт «лишних» (есть в e-SEN, нет в HR)
     tools_frame2 = ctk.CTkFrame(parent, fg_color="transparent")
     tools_frame2.pack(fill="x", padx=20, pady=(0, 5))
 
@@ -381,7 +381,8 @@ def build_medical_page(parent):
     ).pack(side="left")
 
     # ============================================================
-
+    # ФИЛЬТРЫ И ПОИСК
+    # ============================================================
     search_var = ctk.StringVar(value="")
     filter_var = ctk.StringVar(value="all")
     department_var = ctk.StringVar(value=tr("all_departments"))
@@ -436,20 +437,44 @@ def build_medical_page(parent):
             command=lambda v=value: set_filter(v),
         ).pack(side="left", padx=6, pady=8)
 
-    # ДОБАВЛЕНА ГОРИЗОНТАЛЬНАЯ ПРОКРУТКА ДЛЯ ТАБЛИЦЫ
-    table_scroll = ctk.CTkScrollableFrame(
-        parent, 
-        corner_radius=14, 
-        orientation="horizontal",  # Горизонтальная прокрутка
-        scrollbar_button_color="#0d3d4b",
-        scrollbar_button_hover_color="#155e75",
-    )
-    table_scroll.pack(fill="both", expand=True, padx=20, pady=15)
+    # ✅ ГОРИЗОНТАЛЬНАЯ + ВЕРТИКАЛЬНАЯ прокрутка через Canvas
+    table_outer = ctk.CTkFrame(parent, corner_radius=14, fg_color="#07222b")
+    table_outer.pack(fill="both", expand=True, padx=20, pady=15)
 
-    # Внутренний контейнер для таблицы (фиксированная минимальная ширина)
-    table = ctk.CTkFrame(table_scroll, fg_color="transparent")
-    table.pack(fill="both", expand=True)
-    table.configure(width=1400)  # Минимальная ширина таблицы
+    # Создаем Canvas с двумя скроллбарами
+    canvas = tk.Canvas(
+        table_outer,
+        bg="#07222b",
+        highlightthickness=0,
+        scrollregion=(0, 0, 1500, 5000)
+    )
+    
+    # Вертикальный скроллбар
+    v_scrollbar = ctk.CTkScrollbar(
+        table_outer,
+        orientation="vertical",
+        command=canvas.yview,
+        button_color="#0d3d4b",
+        button_hover_color="#155e75"
+    )
+    v_scrollbar.pack(side="right", fill="y")
+    
+    # Горизонтальный скроллбар
+    h_scrollbar = ctk.CTkScrollbar(
+        table_outer,
+        orientation="horizontal",
+        command=canvas.xview,
+        button_color="#0d3d4b",
+        button_hover_color="#155e75"
+    )
+    h_scrollbar.pack(side="bottom", fill="x")
+    
+    canvas.configure(yscrollcommand=v_scrollbar.set, xscrollcommand=h_scrollbar.set)
+    canvas.pack(side="left", fill="both", expand=True)
+
+    # Внутренний фрейм для таблицы
+    table_inner = ctk.CTkFrame(canvas, fg_color="transparent")
+    canvas_window = canvas.create_window((0, 0), window=table_inner, anchor="nw")
 
     headers = [
         tr("fio"),
@@ -461,11 +486,10 @@ def build_medical_page(parent):
         tr("status"),
     ]
     
-    # Фиксированные ширины колонок, чтобы текст не обрезался
     col_widths = [300, 220, 250, 150, 120, 100, 150]
 
     def clear_table():
-        for widget in table.winfo_children():
+        for widget in table_inner.winfo_children():
             widget.destroy()
 
     def render_table():
@@ -473,7 +497,7 @@ def build_medical_page(parent):
 
         for col, (header, width) in enumerate(zip(headers, col_widths)):
             ctk.CTkLabel(
-                table,
+                table_inner,
                 text=header,
                 font=("Arial", 15, "bold"),
                 width=width,
@@ -528,7 +552,7 @@ def build_medical_page(parent):
 
             for col, (value, width) in enumerate(zip(values, col_widths)):
                 if col == 0:
-                    fio_frame = ctk.CTkFrame(table, fg_color="transparent")
+                    fio_frame = ctk.CTkFrame(table_inner, fg_color="transparent")
                     fio_frame.grid(
                         row=row,
                         column=col,
@@ -539,7 +563,7 @@ def build_medical_page(parent):
                     ctk.CTkButton(
                         fio_frame,
                         text=str(value),
-                        width=250,  # Фиксированная ширина для кнопки с ФИО
+                        width=250,
                         anchor="w",
                     ).pack(side="left")
 
@@ -555,7 +579,7 @@ def build_medical_page(parent):
                         ).pack(side="left", padx=(6, 0))
                 else:
                     ctk.CTkLabel(
-                        table,
+                        table_inner,
                         text=str(value),
                         font=("Arial", 14),
                         width=width,
@@ -573,10 +597,19 @@ def build_medical_page(parent):
 
         if row == 1:
             ctk.CTkLabel(
-                table,
+                table_inner,
                 text=tr("nothing_found"),
                 font=("Arial", 16),
             ).grid(row=1, column=0, padx=12, pady=20, sticky="w")
+
+        # Обновляем область прокрутки после рендера
+        table_inner.update_idletasks()
+        canvas.configure(scrollregion=canvas.bbox("all"))
+
+    # Привязка колесика мыши для вертикальной прокрутки
+    def _on_mousewheel(event):
+        canvas.yview_scroll(int(-1*(event.delta/120)), "units")
+    canvas.bind_all("<MouseWheel>", _on_mousewheel)
 
     search_var.trace_add("write", lambda *args: render_table())
     filter_var.trace_add("write", lambda *args: render_table())

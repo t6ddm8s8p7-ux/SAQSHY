@@ -8,7 +8,6 @@ import tkinter as tk
 import customtkinter as ctk
 from datetime import datetime
 
-# Подавляем warning про PhotoImage (это не критично)
 warnings.filterwarnings("ignore", category=UserWarning, module="customtkinter")
 
 from modules import dashboard, hr_page, settings, site_sync, pool_page, hygiene_page
@@ -25,15 +24,12 @@ from modules.ses_objects import build_ses_page
 from modules.letters import build_letters_page
 from modules.dd_page import DDPage
 
-# ИМПОРТ ПЕРЕВОДОВ
 from modules.translations import LANGUAGES, get_language, set_language, tr
 from modules.ui_translations import get_ui_translation
 
-# ================= БРЕНД =================
 APP_NAME = "SAQSHY SanEpi"
 APP_TAG = "Санитарный страж • Sanitary Guardian"
 
-# ================= ПАЛИТРА =================
 GOLD = "#fec50c"
 GOLD_HOVER = "#e0ad00"
 BG_SIDE = "#062a33"
@@ -51,7 +47,6 @@ def _hx(c):
     return "#%02x%02x%02x" % c
 
 def make_logo(size=72, bg=BG_SIDE):
-    """🛡️ Щит стража с шаңыраком внутри."""
     img = tk.PhotoImage(width=size, height=size)
     top, bottom = (0, 147, 176), (0, 84, 112)
     gold = (254, 197, 12)
@@ -119,6 +114,7 @@ class MainWindow:
         self.is_resizing = False
         self.start_x = 0
         self.start_width = 0
+        self.current_page_key = "dashboard"
         
         self._build_ui()
         self._set_active("dashboard")
@@ -126,7 +122,7 @@ class MainWindow:
         self._tick()
 
     def _build_ui(self):
-        # 1. Сайдбар: ширина 400px
+        # 1. Сайдбар
         self.sidebar = ctk.CTkFrame(self.app, width=400, corner_radius=0, fg_color=BG_SIDE)
         self.sidebar.pack(side="left", fill="y")
         self.sidebar.pack_propagate(False)
@@ -136,37 +132,39 @@ class MainWindow:
         self.resize_grip.pack(side="left", fill="y")
         self.resize_grip.pack_propagate(False)
         
-        # 3. Привязка событий: меняем размер ТОЛЬКО при отпускании кнопки мыши
         self.resize_grip.bind("<ButtonPress-1>", self.start_resize)
         self.resize_grip.bind("<ButtonRelease-1>", self.finish_resize)
         self.resize_grip.bind("<Enter>", lambda e: self.resize_grip.configure(fg_color=GOLD, cursor="sb_h_double_arrow"))
         self.resize_grip.bind("<Leave>", lambda e: self.resize_grip.configure(fg_color=BG_SIDE, cursor=""))
 
-        # 4. Основной контент
+        # 3. Основной контент
         self.content = ctk.CTkFrame(self.app, corner_radius=0, fg_color=BG_PAGE)
         self.content.pack(side="right", fill="both", expand=True)
         
         self._build_sidebar()
         self._build_topbar()
-        self.page_frame = ctk.CTkFrame(self.content, corner_radius=0, fg_color="transparent")
+        
+        # 4. СКРОЛЛИРУЕМЫЙ ФРЕЙМ ДЛЯ КОНТЕНТА (главное изменение!)
+        self.page_frame = ctk.CTkScrollableFrame(
+            self.content, 
+            corner_radius=0, 
+            fg_color="transparent",
+            scrollbar_button_color="#0d3d4b",
+            scrollbar_button_hover_color="#155e75"
+        )
         self.page_frame.pack(fill="both", expand=True)
 
     def start_resize(self, event):
-        """Начало изменения ширины сайдбара."""
         self.is_resizing = True
         self.start_x = event.x_root
         self.start_width = self.sidebar.winfo_width()
 
     def finish_resize(self, event):
-        """Применяем новую ширину только ПОСЛЕ отпускания кнопки мыши (без лагов)."""
         if not self.is_resizing:
             return
         self.is_resizing = False
-        
         delta = event.x_root - self.start_x
         new_width = self.start_width + delta
-        
-        # Ограничиваем ширину от 320 до 550px
         if 320 <= new_width <= 550:
             self.sidebar.configure(width=new_width)
 
@@ -192,17 +190,17 @@ class MainWindow:
         groups = [
             (get_ui_translation("персонал", lang), [
                 ("dashboard", "🏠", f" {tr('dashboard')}", self.open_dashboard),
-                ("hr", "👥", f" {tr('hr')}", self.open_hr),
-                ("esen", "🏥", f" {tr('esen')}", self.open_esen),
-                ("medical", "🩺", f" {tr('medical')}", self.open_medical),
+                ("hr", "", f" {tr('hr')}", self.open_hr),
+                ("esen", "", f" {tr('esen')}", self.open_esen),
+                ("medical", "", f" {tr('medical')}", self.open_medical),
                 ("hygiene", "🎓", f" {get_ui_translation('гигиеническое_обучение', lang)}", self.open_hygiene),
             ]),
             (get_ui_translation("контроль", lang), [
                 ("haccp", "🌡️", f" {tr('haccp')}", self.open_haccp),
-                ("pool", "🏊", f" {get_ui_translation('бассейны', lang)}", self.open_pool),
-                ("violations", "📷", f" {get_ui_translation('нарушения', lang)}", self.open_violations),
-                ("lab", "🧪", f" {get_ui_translation('лаборатория', lang)}", self.open_lab),
-                ("complaints", "📢", f" {get_ui_translation('жалобы', lang)}", self.open_complaints),
+                ("pool", "", f" {get_ui_translation('бассейны', lang)}", self.open_pool),
+                ("violations", "", f" {get_ui_translation('нарушения', lang)}", self.open_violations),
+                ("lab", "", f" {get_ui_translation('лаборатория', lang)}", self.open_lab),
+                ("complaints", "", f" {get_ui_translation('жалобы', lang)}", self.open_complaints),
                 ("inspections", "📄", f" {tr('inspections')}", self.open_inspections),
                 ("ses", "🏛️", f" {get_ui_translation('сэс', lang)}", self.open_ses),
                 ("dd", "🛡️", f" {get_ui_translation('дд', lang)}", self.open_dd),
@@ -211,14 +209,14 @@ class MainWindow:
             (get_ui_translation("документы", lang), [
                 ("laws", "📑", f" {tr('laws')}", self.open_laws),
                 ("letters", "✉️", f" {tr('letters')}", self.open_letters),
-                ("reports", "📊", f" {tr('reports')}", self.open_reports),
+                ("reports", "", f" {tr('reports')}", self.open_reports),
             ]),
             (get_ui_translation("интеллект", lang), [
                 ("ai", "🤖", f" {tr('ai_assistant')}", self.open_ai_assistant),
             ]),
             (get_ui_translation("система", lang), [
                 ("settings", "⚙️", f" {tr('settings')}", self.open_settings),
-                ("sitesync", "🔄", f" {get_ui_translation('сайт_haccp', lang)}", lambda: site_sync.open_sync_window()),
+                ("sitesync", "", f" {get_ui_translation('сайт_haccp', lang)}", lambda: site_sync.open_sync_window()),
             ]),
         ]
 
@@ -240,13 +238,12 @@ class MainWindow:
                 btn.configure(command=lambda b=btn_id, m=method: (self._set_active(b), m()))
                 self.nav_buttons[btn_id] = btn
 
-        # Показываем текущий язык (без возможности выбора здесь)
         bottom = ctk.CTkFrame(self.sidebar, fg_color="transparent")
         bottom.pack(fill="x", padx=14, pady=(0, 14))
         current_lang_name = LANGUAGES.get(get_language(), "🇷🇺 Русский")
         ctk.CTkLabel(
             bottom, 
-            text=f"🌐 Язык: {current_lang_name}", 
+            text=f"🌐 {tr('language')}: {current_lang_name}", 
             font=(FONT, 11), 
             text_color=TEXT_MUTED
         ).pack(anchor="w")
@@ -257,8 +254,19 @@ class MainWindow:
         top.pack_propagate(False)
 
         ctk.CTkFrame(top, width=5, corner_radius=0, fg_color=GOLD).pack(side="left", padx=(18, 10), pady=14)
-        self.title_label = ctk.CTkLabel(top, text="", font=(FONT, 18, "bold"), text_color=TEXT_MAIN)
+        
+        title_container = ctk.CTkFrame(top, fg_color="transparent")
+        title_container.pack(side="left")
+        
+        self.title_label = ctk.CTkLabel(title_container, text="", font=(FONT, 18, "bold"), text_color=TEXT_MAIN)
         self.title_label.pack(side="left")
+        
+        self.help_btn = ctk.CTkButton(
+            title_container, text="❓", width=36, height=36, fg_color="transparent",
+            hover_color=BG_HOVER, text_color=TEXT_MAIN, font=(FONT, 16),
+            command=self._show_help
+        )
+        self.help_btn.pack(side="left", padx=10)
 
         right = ctk.CTkFrame(top, fg_color="transparent")
         right.pack(side="right", padx=18)
@@ -321,12 +329,52 @@ class MainWindow:
             widget.destroy()
 
     def _show(self, title_key, builder):
+        self.current_page_key = title_key
         title = get_ui_translation(title_key, get_language())
         self.title_label.configure(text=title)
         self.clear_content()
         builder(self.page_frame)
 
-    # --- МЕТОДЫ ОТКРЫТИЯ СТРАНИЦ ---
+    def _show_help(self):
+        help_texts = {
+            "dashboard": {
+                "ru": "📊 Главная панель\n\nЗдесь вы видите общую сводку по всем объектам.",
+                "kk": "📊 Басқару панелі\n\nМұнда сіз барлық объектілер бойынша жалпы көріністі көресіз."
+            },
+            "hr": {
+                "ru": " HR Сотрудники\n\n1. Нажмите 'Импорт HR Excel'.\n2. Нажмите 'Сравнить с e-SEN'.",
+                "kk": "👥 HR Қызметкерлер\n\n1. 'HR Excel жүктеу' басыңыз.\n2. 'e-SEN-мен салыстыру' басыңыз."
+            },
+            "esen": {
+                "ru": "🏥 e-SEN Center\n\n1. В 'Настройках' введите данные.\n2. Нажмите 'Обновить e-SEN'.",
+                "kk": "🏥 e-SEN орталығы\n\n1. 'Баптаулар' бөлімінде деректерді енгізіңіз.\n2. 'e-SEN жаңарту' басыңыз."
+            },
+            "medical": {
+                "ru": " Медицинские осмотры\n\nКонтроль сроков медкнижек. Используйте фильтры.",
+                "kk": "🩺 Медициналық қарап-тексерулер\n\nМедкітапшалардың мерзімдерін бақылау. Сүзгілерді қолданыңыз."
+            },
+            "settings": {
+                "ru": "️ Настройки\n\n1. Введите БИН, логин и пароль.\n2. Измените язык.\n3. Настройте тему.",
+                "kk": "️ Баптаулар\n\n1. БСН, логин және құпия сөзді енгізіңіз.\n2. Тілді өзгертіңіз.\n3. Тақырыпты баптаңыз."
+            }
+        }
+        
+        lang = get_language()
+        default_text = "ℹ️ Инструкция\n\nИспользуйте элементы управления на этой странице."
+        
+        page_help = help_texts.get(self.current_page_key, {})
+        text = page_help.get(lang, page_help.get("ru", default_text))
+        
+        help_window = ctk.CTkToplevel(self.app)
+        help_window.title("Инструкция / Нұсқаулық")
+        help_window.geometry("550x400")
+        help_window.lift()
+        help_window.focus_force()
+        help_window.grab_set()
+        
+        ctk.CTkLabel(help_window, text=text, font=("Arial", 14), justify="left").pack(fill="both", expand=True, padx=20, pady=20)
+        ctk.CTkButton(help_window, text="Понятно / Түсіндім", width=120, height=35, fg_color="#16a34a", hover_color="#15803d", command=help_window.destroy).pack(pady=10)
+
     def open_dashboard(self): self._show("dashboard", dashboard.build_dashboard_page)
     def open_hr(self): self._show("hr", hr_page.build_hr_page)
     def open_esen(self): self._show("esen", build_esen_page)
@@ -346,7 +394,6 @@ class MainWindow:
     def open_letters(self): self._show("letters", build_letters_page)
     def open_reports(self): self._show("reports", build_reports_page)
     
-    # ИСПРАВЛЕНО: Передаем self (экземпляр MainWindow) вторым аргументом
     def open_settings(self): 
         self._show("settings", lambda parent: settings.build_settings_page(parent, self))
 
