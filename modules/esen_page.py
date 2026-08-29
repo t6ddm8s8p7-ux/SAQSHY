@@ -3,11 +3,11 @@ import customtkinter as ctk
 
 from modules.dashboard_data import load_dashboard_data, clear_dashboard_cache
 from modules.translations import tr
+from modules.loading_button import run_with_loading
 
 
 def make_stat_card(parent, title, value, color):
-    card = ctk.CTkFrame(parent, corner_radius=14, height=100)
-    card.pack_propagate(False)
+    card = ctk.CTkFrame(parent, corner_radius=14)
     
     ctk.CTkLabel(
         card, 
@@ -43,16 +43,19 @@ def build_esen_page(parent):
 
     ctk.CTkLabel(
         parent,
-        text=f"🏥 {tr('esen_center')}",
+        text=f" {tr('esen_center')}",
         font=("Arial", 34, "bold")
     ).pack(pady=(20, 10))
 
     stats_frame = ctk.CTkFrame(parent, corner_radius=14)
     stats_frame.pack(fill="x", padx=20, pady=10)
+    
+    for i in range(6):
+        stats_frame.grid_columnconfigure(i, weight=1, minsize=140)
 
     cards = [
-        (f" {tr('total_esen')}", total, "#60a5fa"),
-        (f" {tr('exists_in_hr')}", matched, "#22c55e"),
+        (f"🔵 {tr('total_esen')}", total, "#60a5fa"),
+        (f"🟢 {tr('exists_in_hr')}", matched, "#22c55e"),
         (f"🟡 {tr('not_in_hr')}", only_esen, "#f59e0b"),
         (f"⏰ {tr('expiring')}", expiring_count, "#f97316"),
         (f"🔄 {tr('medbooks')}", duplicate_count, "#3b82f6"),
@@ -62,10 +65,6 @@ def build_esen_page(parent):
     for i, (title, value, color) in enumerate(cards):
         card = make_stat_card(stats_frame, title, value, color)
         card.grid(row=0, column=i, padx=6, pady=8, sticky="nsew")
-        stats_frame.grid_columnconfigure(i, weight=1)
-    
-    for i in range(len(cards)):
-        stats_frame.grid_columnconfigure(i, weight=1, minsize=140)
 
     action_frame = ctk.CTkFrame(parent, corner_radius=14)
     action_frame.pack(fill="x", padx=20, pady=10)
@@ -75,24 +74,31 @@ def build_esen_page(parent):
             widget.destroy()
         build_esen_page(parent)
 
-    def refresh_esen():
-        from modules import esen
-        esen.open_esen_login()
-        clear_dashboard_cache()
-        rebuild_page()
+    # ✅ ИНДИКАТОР ЗАГРУЗКИ для обновления e-SEN
+    def refresh_esen_with_loading():
+        def task():
+            from modules import esen
+            esen.open_esen_login()
+            clear_dashboard_cache()
+        run_with_loading(btn_refresh, task, success_message="✅ e-SEN обновлён!")
+        # После завершения перестроить страницу
+        parent.after(1500, rebuild_page)
 
-    def compare_with_hr():
-        from modules import compare_employees
-        from modules.export_reports import export_missing_separate_files_by_departments
-        export_missing_separate_files_by_departments()
-        if hasattr(compare_employees, "run_compare"):
-            compare_employees.run_compare()
-        elif hasattr(compare_employees, "compare_employees"):
-            compare_employees.compare_employees()
-        elif hasattr(compare_employees, "run"):
-            compare_employees.run()
-        clear_dashboard_cache()
-        rebuild_page()
+    # ✅ ИНДИКАТОР ЗАГРУЗКИ для сравнения с HR
+    def compare_with_hr_with_loading():
+        def task():
+            from modules import compare_employees
+            from modules.export_reports import export_missing_separate_files_by_departments
+            export_missing_separate_files_by_departments()
+            if hasattr(compare_employees, "run_compare"):
+                compare_employees.run_compare()
+            elif hasattr(compare_employees, "compare_employees"):
+                compare_employees.compare_employees()
+            elif hasattr(compare_employees, "run"):
+                compare_employees.run()
+            clear_dashboard_cache()
+        run_with_loading(btn_compare, task, success_message="✅ Сравнение завершено!")
+        parent.after(1500, rebuild_page)
 
     def show_only_esen():
         window = ctk.CTkToplevel()
@@ -125,28 +131,51 @@ def build_esen_page(parent):
 
         box.configure(state="disabled")
 
-    actions = [
-        (f"🔄 {tr('update_esen')}", refresh_esen),
-        (f"⚖️ {tr('compare_with_hr')}", compare_with_hr),
-        (f"🟡 {tr('not_in_hr')}", show_only_esen),
-        (f"➕ {tr('add_employees')}", None),
-        (f"📄 {tr('export_report')}", None),
-    ]
+    # ✅ Кнопки с сохранением ссылок для блокировки
+    btn_refresh = ctk.CTkButton(
+        action_frame,
+        text=f"🔄 {tr('update_esen')}",
+        width=200,
+        height=42,
+        command=refresh_esen_with_loading
+    )
+    btn_refresh.grid(row=0, column=0, padx=8, pady=10)
 
-    for i, (text, command) in enumerate(actions):
-        ctk.CTkButton(
-            action_frame,
-            text=text,
-            width=200,
-            height=42,
-            command=command
-        ).grid(row=0, column=i, padx=8, pady=10)
-    
-    action_frame.grid_columnconfigure(0, weight=1)
-    action_frame.grid_columnconfigure(1, weight=1)
-    action_frame.grid_columnconfigure(2, weight=1)
-    action_frame.grid_columnconfigure(3, weight=1)
-    action_frame.grid_columnconfigure(4, weight=1)
+    btn_compare = ctk.CTkButton(
+        action_frame,
+        text=f"⚖️ {tr('compare_with_hr')}",
+        width=200,
+        height=42,
+        command=compare_with_hr_with_loading
+    )
+    btn_compare.grid(row=0, column=1, padx=8, pady=10)
+
+    ctk.CTkButton(
+        action_frame,
+        text=f"🟡 {tr('not_in_hr')}",
+        width=200,
+        height=42,
+        command=show_only_esen
+    ).grid(row=0, column=2, padx=8, pady=10)
+
+    ctk.CTkButton(
+        action_frame,
+        text=f"➕ {tr('add_employees')}",
+        width=200,
+        height=42,
+        command=None
+    ).grid(row=0, column=3, padx=8, pady=10)
+
+    ctk.CTkButton(
+        action_frame,
+        text=f"📄 {tr('export_report')}",
+        width=200,
+        height=42,
+        command=None
+    ).grid(row=0, column=4, padx=8, pady=10)
+
+    for i in range(5):
+        action_frame.grid_columnconfigure(i, weight=1)
 
     search_var = ctk.StringVar(value="")
 
@@ -158,11 +187,9 @@ def build_esen_page(parent):
     )
     search_entry.pack(fill="x", padx=20, pady=(5, 10))
 
-    # ✅ ГОРИЗОНТАЛЬНАЯ + ВЕРТИКАЛЬНАЯ прокрутка через Canvas
     table_outer = ctk.CTkFrame(parent, corner_radius=14, fg_color="#07222b")
     table_outer.pack(fill="both", expand=True, padx=20, pady=15)
 
-    # Создаем Canvas с двумя скроллбарами
     canvas = tk.Canvas(
         table_outer,
         bg="#07222b",
@@ -170,7 +197,6 @@ def build_esen_page(parent):
         scrollregion=(0, 0, 1500, 5000)
     )
     
-    # Вертикальный скроллбар
     v_scrollbar = ctk.CTkScrollbar(
         table_outer,
         orientation="vertical",
@@ -180,7 +206,6 @@ def build_esen_page(parent):
     )
     v_scrollbar.pack(side="right", fill="y")
     
-    # Горизонтальный скроллбар
     h_scrollbar = ctk.CTkScrollbar(
         table_outer,
         orientation="horizontal",
@@ -193,7 +218,6 @@ def build_esen_page(parent):
     canvas.configure(yscrollcommand=v_scrollbar.set, xscrollcommand=h_scrollbar.set)
     canvas.pack(side="left", fill="both", expand=True)
 
-    # Внутренний фрейм для таблицы
     table_inner = ctk.CTkFrame(canvas, fg_color="transparent")
     canvas.create_window((0, 0), window=table_inner, anchor="nw")
 
@@ -290,11 +314,9 @@ def build_esen_page(parent):
                 font=("Arial", 16)
             ).grid(row=1, column=0, padx=12, pady=20, sticky="w")
 
-        # Обновляем область прокрутки после рендера
         table_inner.update_idletasks()
         canvas.configure(scrollregion=canvas.bbox("all"))
 
-    # Привязка колесика мыши для вертикальной прокрутки
     def _on_mousewheel(event):
         canvas.yview_scroll(int(-1*(event.delta/120)), "units")
     canvas.bind_all("<MouseWheel>", _on_mousewheel)

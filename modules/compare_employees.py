@@ -10,6 +10,7 @@ from tkinter import filedialog, messagebox
 
 from modules.name_match import names_match
 from modules.export_reports import export_missing_separate_files_by_departments
+from modules.translations import tr
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 HR_FILE = PROJECT_ROOT / "database" / "hr_employees.json"
@@ -19,20 +20,17 @@ HISTORY_FILE = PROJECT_ROOT / "database" / "sync_history.json"
 
 DEP_KEYS = ("отдел", "подраздел", "департамент", "служба", "сектор", "цех", "управлен", "бөлім", "department")
 
-
 # ================= СЛУЖЕБНЫЕ =================
 def load_json(path):
     if not os.path.exists(path):
-        print(f"Файл не найден: {path}")
+        print(tr("file_not_found").format(path=path))
         return []
     with open(path, "r", encoding="utf-8-sig") as f:
         return json.load(f)
 
-
 def save_json(path, data):
     with open(path, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=4)
-
 
 def append_sync_history(result):
     history = []
@@ -55,11 +53,9 @@ def append_sync_history(result):
     history = history[-100:]
     save_json(HISTORY_FILE, history)
 
-
 # ================= ЗАГРУЗКА HR EXCEL =================
 def norm(s):
     return str(s if s is not None else "").strip().lower().replace("ё", "е")
-
 
 def _read_rows(path):
     path = str(path)
@@ -78,7 +74,6 @@ def _read_rows(path):
         wb.close()
         return rows
 
-
 def _col_values(rows, j):
     out = []
     for r in rows:
@@ -86,7 +81,6 @@ def _col_values(rows, j):
         if v:
             out.append(v)
     return out
-
 
 def _stats(rows, j):
     vals = _col_values(rows, j)
@@ -102,19 +96,15 @@ def _stats(rows, j):
         "dep_kw": sum(1 for v in vals if any(k in v.lower() for k in DEP_KEYS)),
     }
 
-
 def _is_fio_header(c):
     return ("фио" in c or "сотрудник" in c or "фамилия" in c or "ф.и.о" in c
             or "тегі" in c or "аты" in c or "қызметкер" in c or "full name" in c)
 
-
 def _is_pos_header(c):
     return ("должност" in c or "лауазым" in c or "позици" in c or "position" in c)
 
-
 def _is_dep_header(c):
     return any(k in c for k in DEP_KEYS)
-
 
 def detect_columns(rows):
     for i, row in enumerate(rows[:10]):
@@ -155,7 +145,6 @@ def detect_columns(rows):
     pos = max(rest2, key=lambda j: stats[j]["card"]) if rest2 else None
     return {"fio": fio, "pos": pos, "dep": dep}, -1
 
-
 def parse_employees(rows):
     idx, header_i = detect_columns(rows)
     data = rows[header_i + 1:] if header_i >= 0 else rows
@@ -182,10 +171,9 @@ def parse_employees(rows):
         })
     return emps
 
-
 def choose_excel():
     path = filedialog.askopenfilename(
-        title="Выберите файл HR (Excel или CSV)",
+        title=tr("select_hr_file"),
         filetypes=[("Excel/CSV", "*.xlsx *.xls *.csv"), ("Все файлы", "*.*")],
     )
     if not path:
@@ -193,12 +181,12 @@ def choose_excel():
     try:
         rows = _read_rows(path)
     except Exception as e:
-        messagebox.showerror("Ошибка чтения", f"Не удалось прочитать файл:\n{e}")
+        messagebox.showerror(tr("read_error"), tr("failed_to_read_file").format(e=e))
         return None
 
     employees = parse_employees(rows)
     if not employees:
-        messagebox.showwarning("Внимание", "Сотрудники не найдены. Проверьте, что в файле есть колонка с ФИО.")
+        messagebox.showwarning(tr("warning"), tr("employees_not_found_check_fio"))
         return None
 
     HR_FILE.parent.mkdir(parents=True, exist_ok=True)
@@ -206,9 +194,8 @@ def choose_excel():
         json.dump(employees, f, ensure_ascii=False, indent=2)
 
     deps = len(set(e["Отдел"] for e in employees if e["Отдел"]))
-    messagebox.showinfo("Успех", f"✅ Загружено сотрудников: {len(employees)}\n🏢 Отделов: {deps}")
+    messagebox.showinfo(tr("success"), tr("loaded_employees_and_departments").format(count=len(employees), deps=deps))
     return employees
-
 
 def load_hr_employees():
     if not HR_FILE.exists():
@@ -220,15 +207,12 @@ def load_hr_employees():
     except Exception:
         return []
 
-
 # ================= СВЕРКА С e-SEN =================
 def get_hr_name(emp):
     return str(emp.get("Сотрудник", "")).strip()
 
-
 def get_esen_name(emp):
     return str(emp.get("fio", "")).strip()
-
 
 def find_best_match(hr_name, esen_list, used_esen):
     for i, esen_emp in enumerate(esen_list):
@@ -238,7 +222,6 @@ def find_best_match(hr_name, esen_list, used_esen):
             return (i, esen_emp)
     return None
 
-
 def enrich_esen_with_hr(esen_emp, hr_emp):
     esen_emp["department"] = hr_emp.get("Отдел", "")
     esen_emp["hr_position"] = hr_emp.get("Должность", "")
@@ -247,7 +230,6 @@ def enrich_esen_with_hr(esen_emp, hr_emp):
     esen_emp["hr_birth_date"] = hr_emp.get("Дата рождения", "")
     esen_emp["matched_with_hr"] = True
     return esen_emp
-
 
 def compare_employees():
     hr = load_json(HR_FILE)
@@ -298,20 +280,18 @@ def compare_employees():
     save_json(ESEN_FILE, esen)
     save_json(RESULT_FILE, result)
 
-    print("✅ Сверка завершена")
-    print(f"HR Excel: {len(hr)}")
-    print(f"e-SEN: {len(esen)}")
-    print(f"Совпали: {len(matched)}")
-    print(f"Есть в HR, но нет в e-SEN: {len(only_hr)}")
-    print(f"Есть в e-SEN, но нет в HR: {len(only_esen)}")
+    print(tr("comparison_completed"))
+    print(tr("hr_excel_count").format(count=len(hr)))
+    print(tr("esen_count").format(count=len(esen)))
+    print(tr("matched_count").format(count=len(matched)))
+    print(tr("only_hr_count").format(count=len(only_hr)))
+    print(tr("only_esen_count").format(count=len(only_esen)))
 
     export_missing_separate_files_by_departments()
     return result
 
-
 def run_compare():
     return compare_employees()
-
 
 def run():
     return compare_employees()

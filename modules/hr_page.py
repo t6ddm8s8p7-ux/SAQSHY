@@ -5,12 +5,12 @@ from modules.dashboard_data import load_dashboard_data, get_department
 from modules.employee_card import show_employee_card
 from modules.translations import tr
 from modules.localization import translate_department
+from modules.loading_button import run_with_loading
 
 
 def make_stat_card(parent, title, value, color):
     card = ctk.CTkFrame(parent, corner_radius=14)
-    card.pack(side="left", padx=8, pady=8, fill="x", expand=True)
-
+    
     ctk.CTkLabel(
         card,
         text=title,
@@ -23,6 +23,8 @@ def make_stat_card(parent, title, value, color):
         text=str(value),
         font=("Arial", 24, "bold")
     ).pack(pady=(0, 10))
+    
+    return card
 
 
 def build_hr_page(parent):
@@ -50,35 +52,40 @@ def build_hr_page(parent):
             widget.destroy()
         build_hr_page(parent)
 
-    def import_hr_excel():
-        from modules import excel_employees
-        from modules import compare_employees
+    # ✅ ИНДИКАТОР ЗАГРУЗКИ для импорта HR Excel
+    def import_hr_excel_with_loading():
+        def task():
+            from modules import excel_employees
+            from modules import compare_employees
+            employees = excel_employees.choose_excel()
+            if employees is None:
+                return False
+            if hasattr(compare_employees, "run_compare"):
+                compare_employees.run_compare()
+            elif hasattr(compare_employees, "compare_employees"):
+                compare_employees.compare_employees()
+            elif hasattr(compare_employees, "run"):
+                compare_employees.run()
+            return True
+        
+        def on_complete():
+            reload_page()
+        
+        run_with_loading(btn_import, task, success_message="✅ HR Excel импортирован!")
+        parent.after(1500, on_complete)
 
-        employees = excel_employees.choose_excel()
-
-        if employees is None:
-            return
-
-        if hasattr(compare_employees, "run_compare"):
-            compare_employees.run_compare()
-        elif hasattr(compare_employees, "compare_employees"):
-            compare_employees.compare_employees()
-        elif hasattr(compare_employees, "run"):
-            compare_employees.run()
-
-        reload_page()
-
-    def compare_with_esen():
-        from modules import compare_employees
-
-        result = compare_employees.run_compare()
-
-        print("✅ Сравнение завершено")
-        print(f"Совпали: {len(result['matched'])}")
-        print(f"Нет в e-SEN: {len(result['only_hr'])}")
-        print(f"Нет в HR: {len(result['only_esen'])}")
-
-        reload_page()
+    # ✅ ИНДИКАТОР ЗАГРУЗКИ для сравнения с e-SEN
+    def compare_with_esen_with_loading():
+        def task():
+            from modules import compare_employees
+            result = compare_employees.run_compare()
+            print("✅ Сравнение завершено")
+            print(f"Совпали: {len(result['matched'])}")
+            print(f"Нет в e-SEN: {len(result['only_hr'])}")
+            print(f"Нет в HR: {len(result['only_esen'])}")
+        
+        run_with_loading(btn_compare, task, success_message="✅ Сравнение с e-SEN завершено!")
+        parent.after(1500, reload_page)
 
     ctk.CTkLabel(
         parent,
@@ -88,30 +95,42 @@ def build_hr_page(parent):
 
     stats_frame = ctk.CTkFrame(parent, corner_radius=14)
     stats_frame.pack(padx=20, pady=10, fill="x")
+    
+    for i in range(4):
+        stats_frame.grid_columnconfigure(i, weight=1, minsize=150)
 
-    make_stat_card(stats_frame, f"👥 {tr('total_hr')}", total_hr, "#60a5fa")
-    make_stat_card(stats_frame, f"🟢 {exists_text}", exists_count, "#22c55e")
-    make_stat_card(stats_frame, f"🔴 {not_exists_text}", only_hr_count, "#ef4444")
-    make_stat_card(stats_frame, f"🏢 {tr('departments')}", len(departments), "#a78bfa")
+    cards = [
+        (f" {tr('total_hr')}", total_hr, "#60a5fa"),
+        (f"🟢 {exists_text}", exists_count, "#22c55e"),
+        (f" {not_exists_text}", only_hr_count, "#ef4444"),
+        (f" {tr('departments')}", len(departments), "#a78bfa"),
+    ]
+
+    for i, (title, value, color) in enumerate(cards):
+        card = make_stat_card(stats_frame, title, value, color)
+        card.grid(row=0, column=i, padx=8, pady=8, sticky="nsew")
 
     action_frame = ctk.CTkFrame(parent, corner_radius=14)
     action_frame.pack(padx=20, pady=10, fill="x")
 
-    ctk.CTkButton(
+    # ✅ Кнопки с сохранением ссылок для блокировки
+    btn_import = ctk.CTkButton(
         action_frame,
-        text=f" {tr('import_hr_excel')}",
+        text=f"📥 {tr('import_hr_excel')}",
         width=240,
         height=40,
-        command=import_hr_excel
-    ).pack(side="left", padx=10, pady=10)
+        command=import_hr_excel_with_loading
+    )
+    btn_import.pack(side="left", padx=10, pady=10)
 
-    ctk.CTkButton(
+    btn_compare = ctk.CTkButton(
         action_frame,
         text=f"⚖️ {tr('compare_with_esen')}",
         width=240,
         height=40,
-        command=compare_with_esen
-    ).pack(side="left", padx=10, pady=10)
+        command=compare_with_esen_with_loading
+    )
+    btn_compare.pack(side="left", padx=10, pady=10)
 
     filter_frame = ctk.CTkFrame(parent, corner_radius=14)
     filter_frame.pack(padx=20, pady=10, fill="x")
@@ -123,7 +142,7 @@ def build_hr_page(parent):
     ctk.CTkEntry(
         filter_frame,
         textvariable=search_var,
-        placeholder_text=f"🔍 {tr('search_hr')}",
+        placeholder_text=f" {tr('search_hr')}",
         width=350,
         height=38
     ).grid(row=0, column=0, padx=15, pady=15)
@@ -152,11 +171,9 @@ def build_hr_page(parent):
         height=38
     ).grid(row=0, column=2, padx=15, pady=15)
 
-    # ✅ ГОРИЗОНТАЛЬНАЯ + ВЕРТИКАЛЬНАЯ прокрутка через Canvas
     table_outer = ctk.CTkFrame(parent, corner_radius=14, fg_color="#07222b")
     table_outer.pack(padx=20, pady=10, fill="both", expand=True)
 
-    # Создаем Canvas с двумя скроллбарами
     canvas = tk.Canvas(
         table_outer,
         bg="#07222b",
@@ -164,7 +181,6 @@ def build_hr_page(parent):
         scrollregion=(0, 0, 1500, 5000)
     )
     
-    # Вертикальный скроллбар
     v_scrollbar = ctk.CTkScrollbar(
         table_outer,
         orientation="vertical",
@@ -174,7 +190,6 @@ def build_hr_page(parent):
     )
     v_scrollbar.pack(side="right", fill="y")
     
-    # Горизонтальный скроллбар
     h_scrollbar = ctk.CTkScrollbar(
         table_outer,
         orientation="horizontal",
@@ -187,7 +202,6 @@ def build_hr_page(parent):
     canvas.configure(yscrollcommand=v_scrollbar.set, xscrollcommand=h_scrollbar.set)
     canvas.pack(side="left", fill="both", expand=True)
 
-    # Внутренний фрейм для таблицы
     table_inner = ctk.CTkFrame(canvas, fg_color="transparent")
     canvas.create_window((0, 0), window=table_inner, anchor="nw")
 
@@ -229,7 +243,7 @@ def build_hr_page(parent):
 
             status_key = "not_in_esen" if name.lower() in only_hr_names else "exists_in_esen"
             status_plain = tr(status_key)
-            status_text = f"🔴 {tr('not_in_esen')}" if status_key == "not_in_esen" else f"🟢 {tr('exists_in_esen')}"
+            status_text = f" {tr('not_in_esen')}" if status_key == "not_in_esen" else f" {tr('exists_in_esen')}"
 
             if query:
                 searchable = f"{name} {position} {dep} {translate_department(dep)}".lower()
@@ -277,11 +291,9 @@ def build_hr_page(parent):
                 font=("Arial", 16)
             ).grid(row=1, column=0, padx=12, pady=20, sticky="w")
 
-        # Обновляем область прокрутки после рендера
         table_inner.update_idletasks()
         canvas.configure(scrollregion=canvas.bbox("all"))
 
-    # Привязка колесика мыши для вертикальной прокрутки
     def _on_mousewheel(event):
         canvas.yview_scroll(int(-1*(event.delta/120)), "units")
     canvas.bind_all("<MouseWheel>", _on_mousewheel)

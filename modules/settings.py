@@ -7,6 +7,7 @@ from pathlib import Path
 from tkinter import messagebox
 
 from modules.translations import LANGUAGES, get_language, set_language, tr
+from modules.crypto import encrypt_text, decrypt_text, is_encrypted
 
 
 def _save_setting(key, value):
@@ -43,10 +44,9 @@ def build_settings_page(parent, main_window):
     print("=== НАЧАЛО build_settings_page ===")
     print(f"Текущий язык: {lang}")
     
-    # Заголовок
     ctk.CTkLabel(
         parent,
-        text="️ " + tr('settings'),
+        text="⚙️ " + tr('settings'),
         font=("Arial", 34, "bold")
     ).pack(pady=(20, 10))
     
@@ -56,7 +56,7 @@ def build_settings_page(parent, main_window):
     
     ctk.CTkLabel(
         esen_frame,
-        text=" e-SEN баптаулары / Настройки e-SEN",
+        text="🔐 e-SEN баптаулары / Настройки e-SEN",
         font=("Arial", 18, "bold"),
         text_color="#fec50c"
     ).pack(anchor="w", padx=20, pady=(15, 10))
@@ -72,13 +72,17 @@ def build_settings_page(parent, main_window):
         anchor="w"
     ).pack(fill="x", padx=10, pady=5)
     
+    # ✅ ЗАГРУЗКА И ДЕШИФРОВКА логина
+    encrypted_login = _load_setting("esen_login", "")
+    login_value = decrypt_text(encrypted_login) if encrypted_login else ""
+    
     bin_entry = ctk.CTkEntry(
         bin_frame,
         placeholder_text="Введите БИН объекта",
         width=400,
         height=38
     )
-    bin_entry.insert(0, _load_setting("esen_login", ""))
+    bin_entry.insert(0, login_value)
     bin_entry.pack(fill="x", padx=10, pady=5)
     
     # Пароль
@@ -92,6 +96,10 @@ def build_settings_page(parent, main_window):
         anchor="w"
     ).pack(fill="x", padx=10, pady=5)
     
+    # ✅ ЗАГРУЗКА И ДЕШИФРОВКА пароля
+    encrypted_password = _load_setting("esen_password", "")
+    password_value = decrypt_text(encrypted_password) if encrypted_password else ""
+    
     pass_entry = ctk.CTkEntry(
         pass_frame,
         placeholder_text="Введите пароль",
@@ -99,7 +107,7 @@ def build_settings_page(parent, main_window):
         width=400,
         height=38
     )
-    pass_entry.insert(0, _load_setting("esen_password", ""))
+    pass_entry.insert(0, password_value)
     pass_entry.pack(fill="x", padx=10, pady=5)
     
     # Ссылка
@@ -123,10 +131,16 @@ def build_settings_page(parent, main_window):
     url_entry.pack(fill="x", padx=10, pady=5)
     
     def save_esen_settings():
-        _save_setting("esen_login", bin_entry.get())
-        _save_setting("esen_password", pass_entry.get())
-        _save_setting("esen_url", url_entry.get())
-        messagebox.showinfo("SanEpi AI", "✅ Настройки e-SEN сохранены!")
+        login = bin_entry.get()
+        password = pass_entry.get()
+        url = url_entry.get()
+        
+        # ✅ ШИФРОВАНИЕ перед сохранением
+        _save_setting("esen_login", encrypt_text(login))
+        _save_setting("esen_password", encrypt_text(password))
+        _save_setting("esen_url", url)
+        
+        messagebox.showinfo("SanEpi AI", "✅ Настройки e-SEN сохранены (зашифрованы)!")
     
     ctk.CTkButton(
         esen_frame,
@@ -152,7 +166,6 @@ def build_settings_page(parent, main_window):
         text_color="#fec50c"
     ).pack(anchor="w", padx=20, pady=(15, 10))
     
-    # Язык
     lang_frame = ctk.CTkFrame(interface_frame, fg_color="transparent")
     lang_frame.pack(fill="x", padx=20, pady=10)
     
