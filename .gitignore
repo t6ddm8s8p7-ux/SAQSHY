@@ -1,36 +1,42 @@
-# СЕКРЕТЫ — никогда не публикуем!
-.env
-*.pem
-*.key
-
-# БАЗЫ ДАННЫХ И ЛИЧНЫЕ ДАННЫЕ
-*.db
-*.sqlite
-*.sqlite3
-database/
-*.json
-
-# Документы и данные с личными сведениями
-SanEpi-AI/
-Журналы/
-Фото нарушений/
-Приказы/
-Идеи/
-Логотип и бренд/
-Техническое задание/
-Шаблон документов/
-*.xlsx
-*.xls
-*.docx
-*.wps
-
-# Python мусор
-__pycache__/
-*.pyc
-*.pyo
-.venv/
-venv/
-
-# Служебное
-knowledge_base/
+# Логи
+logs/
 *.log
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv/
+pip-log.txt
+pip-delete-this-directory.txt
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Конфигурации с чувствительными данными
+config.json
+database/*.json
+database/*.db
+database/language.json
+database/.encryption_key
+
+# Экспорты
+exports/
+
+# Webdriver
+.wdm/
+chromedriver.exe
+geckodriver.exe
+.env
